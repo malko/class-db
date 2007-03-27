@@ -45,7 +45,7 @@ class db{
 	var $beverbose = FALSE;
 	var $autoconnect = TRUE;
 	/** 
-	*charactere utilisé pour proteger les noms de champs 
+	*chr to protect fields names in queries
 	*@private 
 	*/
 	var $_protect_fldname = '`';
