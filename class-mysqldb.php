@@ -1,7 +1,7 @@
 <?php
 /**
 * @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyright (l) 2004-2005  Jonathan Gotti
+* @copyleft (l) 2004-2005  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
@@ -47,7 +47,7 @@ class mysqldb extends db{
       return FALSE;
     if($dbname)
       $this->dbname = $dbname;
-    if(! $this->db = @mysql_select_db($this->dbname,$this->conn)){
+    if(! $this->db = mysql_select_db($this->dbname,$this->conn)){
       $this->verbose("FATAL ERROR CAN'T CONNECT TO database ".$this->dbname);
       $this->set_error(__FUNCTION__);
       return FALSE;
@@ -109,10 +109,10 @@ class mysqldb extends db{
 			$result_type = 'ASSOC';
 		eval('$result_type = MYSQL_'.strtoupper($result_type).';');
     
-    while($res[]=@mysql_fetch_array($result_set,$result_type));
+    while($res[]=mysql_fetch_array($result_set,$result_type));
     unset($res[count($res)-1]);//unset last empty row
 
-    $this->num_rows = @mysql_affected_rows($this->conn);
+    $this->num_rows = mysql_affected_rows($this->conn);
     return $this->last_q2a_res = count($res)?$res:FALSE;
   }
   
@@ -121,7 +121,7 @@ class mysqldb extends db{
   *@return mixed (certainly int)
   */
 	function last_insert_id(){
-    return $this->conn?@mysql_insert_id($this->conn):FALSE;
+    return $this->conn?mysql_insert_id($this->conn):FALSE;
   }
   
 	/**
@@ -130,7 +130,7 @@ class mysqldb extends db{
 	* @return str
 	*/
 	function escape_string($string,$quotestyle='both'){
-		$string = @mysql_real_escape_string($string,$this->conn);
+		$string = mysql_real_escape_string($string,$this->conn);
 		switch(strtolower($quotestyle)){
 			case 'double':
 			case 'd':
@@ -162,7 +162,7 @@ class mysqldb extends db{
     }
 		if($this->beverbose)
 			echo "$Q_str\n";
-    if(! $this->last_qres = @mysql_query($Q_str,$this->conn))
+    if(! $this->last_qres = mysql_query($Q_str,$this->conn))
       $this->set_error(__FUNCTION__);
     return $this->last_qres;
   }
@@ -175,7 +175,7 @@ class mysqldb extends db{
   function query_affected_rows($Q_str){
 		if(! $this->query($Q_str) )
 			return FALSE;
-    $num = @mysql_affected_rows($this->conn);
+    $num = mysql_affected_rows($this->conn);
     if( $num == -1){
       $this->set_error(__FUNCTION__);
 			return FALSE;
@@ -254,7 +254,7 @@ class mysqldb extends db{
   * @param gtkprogress &$progress is an optional progressbar to trace activity (will received a value between 0 to 100)
   */
   function dump_to_file($out_file,$droptables=TRUE,$gziped=TRUE){
-    @set_time_limit(0); # deactivate time limit when doable for big database dumping
+    set_time_limit(0); # deactivate time limit when doable for big database dumping
     if($gziped){
       if(! $fout = gzopen($out_file,'w'))
         return FALSE;
@@ -289,7 +289,7 @@ class mysqldb extends db{
           foreach($row as $field=>$value){
             if($i==0){ # on the first line we get fields 
               $fields[] = "`$field`";
-              if( @mysql_field_type($this->last_qres,$z++) == 'string') # will permit to correctly protect number in string fields
+              if( mysql_field_type($this->last_qres,$z++) == 'string') # will permit to correctly protect number in string fields
                 $stringsfields[$field]  = TRUE;
             }
             if(preg_match("!^-?\d+(\.\d+)?$!",$value) && !$stringsfields[$field])
