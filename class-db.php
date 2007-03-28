@@ -8,7 +8,11 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-03-26 - better fields name handling (auto-protect fieldsname even if string is given)
+* @changelog - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow the use of function,
+*                           wild char or alias in fields list. will perhaps permit this again with a more effective regex in the future.
+*                           so at this time it's up to you to use this method as needed on any select_* method (still applyed for insert and update)
+*                         - move last_q2a_res assignment to query_to_array() method instead fetch_res() (seems more ligical to me)
+*            - 2007-03-26 - better fields name handling (auto-protect fieldsname even if string is given)
 *            - 2007-01-12 - better values type handling in update and insert methods
 *            - 2007-01-10 - correct a bug about page counting in set_slice_attrs() and add %page replacement to fromatStr
 *                         - better params type handling in method process_conds()  (int/string/array/null)
@@ -167,7 +171,7 @@ class db{
 			$this->set_error(__FUNCTION__);
 			return FALSE;
 		}
-		return $this->fetch_res($this->last_qres,$result_type);
+		return $this->last_q2a_res = $this->fetch_res($this->last_qres,$result_type);
 	}
 
 	/**
@@ -183,7 +187,7 @@ class db{
 		if(! $tb_str = $this->array_to_str($tables))
 			return FALSE;
 		//we make the fields list for the Q_str
-		if(! $fld_str =  $this->protect_field_names($fields))
+    if(! $fld_str = $this->array_to_str($fields) )
 			$fld_str = '*';
 		//now the WHERE str
 		$conds_str = $this->process_conds($conds);
@@ -234,7 +238,6 @@ class db{
 	*/
 	function select_field_to_array($table,$field,$conds=null){
 		$conds_str = $this->process_conds($conds);
-		$field = $this->protect_field_names($field);
 		$Q_str = "SELECT $field FROM $table $conds_str";
 		if(! $res = $this->query_to_array($Q_str,'NUM') )
 			return FALSE;
@@ -497,21 +500,21 @@ class db{
 	}
 	/**
 	* used internally to prepare fields for queries 
-	* @param string|array $fields list of fields
+	* @param string|array $fields list of fields. it's up to you to protect fieldsname if you put in fields as string
 	* @private
 	*/
 	function protect_field_names($fields){
-		if(is_array($fields)){
-			foreach($fields as $k=>$f)
-				$fields[$k] = $this->_protect_fldname.$v.$this->_protect_fldname;
-			$fields = implode(',',$fields);
-		}elseif($fields){
-			if(! substr_count($fields,$this->_protect_fldname) ) # if already protected we do nothing
-				$fields = preg_replace('!\s*,\s*!',$this->_protect_fldname.','.$this->_protect_fldname,$fields);
-				$fields = $this->_protect_fldname . trim($fields) . $this->_protect_fldname;
-			}
-		}
-		return $fields?$fields:false;
+    if(is_array($fields)){
+      foreach($fields as $k=>$f)
+        $fields[$k] = $this->_protect_fldname.$f.$this->_protect_fldname;
+      $fields = implode(',',$fields);
+    }elseif($fields){
+      if(! substr_count($fields,$this->_protect_fldname) ){ # if already protected we do nothing
+        $fields = preg_replace('!\s*,\s*!',$this->_protect_fldname.','.$this->_protect_fldname,$fields);
+        $fields = $this->_protect_fldname . trim($fields) . $this->_protect_fldname;
+      }
+    }
+    return $fields?$fields:false;
 	}
 	
 	function array_to_str($var,$sep=','){

@@ -6,10 +6,11 @@
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first version
-* @changelog  2007-01-12 now dump_to_file() use method escape_string instead of mysql_escape_string
-*             2005-02-28 add method optimize 
-*             2004-12-03 now the associative_array_from_q2a_res method won't automaticly ksort the results 
-*             2004-12-02 use the show fields query in place of a select statement and add extended_info mode to the get_fields method
+* @changelog - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more ligical to me)
+*            - 2007-01-12 - now dump_to_file() use method escape_string instead of mysql_escape_string
+*            - 2005-02-28 - add method optimize 
+*            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results 
+*            - 2004-12-02 - use the show fields query in place of a select statement and add extended_info mode to the get_fields method
 * @todo revoir la methode check_conn() et open et close de facon a ce que check_conn aille dans base_db
 * @todo ameliorer fetch_res
 * @todo ajouter list_dbs as base db
@@ -113,7 +114,7 @@ class mysqldb extends db{
     unset($res[count($res)-1]);//unset last empty row
 
     $this->num_rows = mysql_affected_rows($this->conn);
-    return $this->last_q2a_res = count($res)?$res:FALSE;
+    return count($res)?$res:FALSE;
   }
   
   /**
