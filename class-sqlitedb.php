@@ -1,6 +1,6 @@
 <?php
 # load the extension if needed
-if(! extension_loaded('php_sqlite') ){
+if(! extension_loaded('php_sqlite') )
 	dl((strtoupper(substr(PHP_OS, 0,3)) == 'WIN')?'php_sqlite.dll':'sqlite.so');
 
 if(! class_exists('db'))
