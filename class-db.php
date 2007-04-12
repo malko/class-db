@@ -11,7 +11,7 @@
 * @changelog - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow the use of function,
 *                           wild char or alias in fields list. will perhaps permit this again with a more effective regex in the future.
 *                           so at this time it's up to you to use this method as needed on any select_* method (still applyed for insert and update)
-*                         - move last_q2a_res assignment to query_to_array() method instead fetch_res() (seems more ligical to me)
+*                         - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more ligical to me)
 *            - 2007-03-26 - better fields name handling (auto-protect fieldsname even if string is given)
 *            - 2007-01-12 - better values type handling in update and insert methods
 *            - 2007-01-10 - correct a bug about page counting in set_slice_attrs() and add %page replacement to fromatStr
