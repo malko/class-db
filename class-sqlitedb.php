@@ -52,7 +52,6 @@ class sqlitedb extends db{
     $this->conn = &$this->db; # only for better compatibility with other db implementation
 		if($this->autoconnect)
 			$this->open();
-		print_r($this);
   }
 ###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
   /** open connection to database */
