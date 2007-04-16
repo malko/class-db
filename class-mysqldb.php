@@ -231,7 +231,10 @@ class mysqldb extends db{
 		return $this->conn?mysql_errno($this->conn):FALSE;
 	}
 	
-	function error_str(){
+	/**
+	* @param void $errno only there for compatibility with other db implementation so totally unused there
+	*/
+	function error_str($errno=null){
 		return mysql_error($this->conn);
 	}
   /**
