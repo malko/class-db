@@ -1,8 +1,5 @@
 <?php
-# load the extension if needed
-if(! extension_loaded('php_sqlite') )
-	dl((strtoupper(substr(PHP_OS, 0,3)) == 'WIN')?'php_sqlite.dll':'sqlite.so');
-
+# load base class 
 if(! class_exists('db'))
     require(dirname(__file__).'/class-db.php');
 
@@ -28,7 +25,7 @@ class sqlitedb extends db{
   var $buffer_on = TRUE;
   var $autocreate= FALSE;
   var $db_file = '';
-  var $_protect_fldname = null;
+  var $_protect_fldname = "'";
   /**
   * create a sqlitedb object for managing locale data
   * if DATA_PATH is define will force access in this directory
@@ -43,17 +40,19 @@ class sqlitedb extends db{
         break;
       case 'w':
         $mod = 0666;
-        $this->autocreate = TRUE;
         break;
       default:
-        if(is_numeric($mode))
-          $mod = $mode;
+				$mod = is_numeric($mode)?$mode:0666;
     }
-    $this->mode       = (isset($mod)?$mod:0666);
+    $this->mode = $mod;
+		if($this->mode >= 0600)
+			$this->autocreate = true;
     $this->host = 'localhost';
     $this->db_file = $db_file;
-    $this->conn = &$this->db;
-    $this->db();
+    $this->conn = &$this->db; # only for better compatibility with other db implementation
+		if($this->autoconnect)
+			$this->open();
+		print_r($this);
   }
 ###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
   /** open connection to database */
@@ -89,7 +88,7 @@ class sqlitedb extends db{
     $result_type = strtoupper($result_type);
     if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
       $result_type = 'ASSOC';
-    eval('$result_type = SQLITE_'.strtoupper($result_type).';');
+    eval('$result_type = SQLITE_'.$result_type.';');
     
     while($res[]=sqlite_fetch_array($result_set,$result_type));
     unset($res[count($res)-1]);//unset last empty row
@@ -116,6 +115,8 @@ class sqlitedb extends db{
       if(! ($this->autoconnect && $this->open()) )
         return FALSE;
     }
+		if($this->beverbose)
+			echo "$Q_str\n";
     if($this->buffer_on)
       $this->last_qres = sqlite_query($this->db,$Q_str);
     else
@@ -136,7 +137,7 @@ class sqlitedb extends db{
   function query_affected_rows($Q_str){
     if(! $this->query($Q_str) )
       return FALSE;
-    return @sqlite_changes($this->db);
+    return sqlite_changes($this->db);
   }
 
   /**
@@ -220,8 +221,8 @@ class sqlitedb extends db{
   function error_no(){
     return $this->db?sqlite_last_error($this->db):FALSE;
   }
-
-  function error_str($errno){
+	
+	function error_str($errno=null){
     return sqlite_error_string($errno);
   }
 
