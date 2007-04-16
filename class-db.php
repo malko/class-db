@@ -76,7 +76,7 @@ class db{
 	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
 	* @see sqlitedb or mysqldb implementation for exemple
 	*/
-	function fetch_res($result_set,$result_type){}
+	function fetch_res($result_set,$result_type='ASSOC'){}
 
 	function last_insert_id(){}
 
@@ -155,7 +155,7 @@ class db{
 	function optimize($table){}
 
 	function error_no(){}
-	function error_str(){}
+	function error_str($errno=null){}
 
 	###*** COMMON METHODS ***###
 
@@ -509,7 +509,7 @@ class db{
         $fields[$k] = $this->_protect_fldname.$f.$this->_protect_fldname;
       $fields = implode(',',$fields);
     }elseif($fields){
-      if(! substr_count($fields,$this->_protect_fldname) ){ # if already protected we do nothing
+      if( $this->_protect_fldname && ! substr_count($fields,$this->_protect_fldname) ){ # if already protected we do nothing
         $fields = preg_replace('!\s*,\s*!',$this->_protect_fldname.','.$this->_protect_fldname,$fields);
         $fields = $this->_protect_fldname . trim($fields) . $this->_protect_fldname;
       }
