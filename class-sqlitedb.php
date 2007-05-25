@@ -62,7 +62,7 @@ class sqlitedb extends db{
     if(! $this->db_file )
       return FALSE;
     if(! (is_file($this->db_file) || $this->autocreate) )
-      return false;
+      return FALSE;
     if( $this->db = sqlite_open($this->db_file, $this->mode, $error)){
       return $this->db;
     }else{
@@ -160,7 +160,6 @@ class sqlitedb extends db{
       $default = '(?:DEFAULT\s+((["\']).*?(?<!\\\\)\\4|[^\s,]+))?\s*';
       if( preg_match_all('/(\w+)\s+'.$type.$default.'[^,]*(,|\))/i',$flds_str,$m,PREG_SET_ORDER) ){
         $key  = "PRIMARY|UNIQUE|CHECK";
-        $null = 'NOT\s*NULL';
         $Extra = 'AUTOINCREMENT';
         $default = 'DEFAULT\s+((["\'])(.*?)(?<!\\\\)\\2|\S+)';
         foreach($m as $v){
