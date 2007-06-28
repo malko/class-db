@@ -2,7 +2,7 @@
 /**
 * Base class for databases object.
 * @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2004-2005  Jonathan Gotti
+* @copyleft (l) 2004-2007  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2006-04-16 first version

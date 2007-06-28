@@ -1,12 +1,12 @@
 <?php
 /**
 * @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2004-2005  Jonathan Gotti
+* @copyleft (l) 2004-2007  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first version
-* @changelog - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more ligical to me)
+* @changelog - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more logical to me)
 *            - 2007-01-12 - now dump_to_file() use method escape_string instead of mysql_escape_string
 *            - 2005-02-28 - add method optimize 
 *            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results 

@@ -2,7 +2,7 @@
 /**
 * Ssqeleton class to construct an extended db class.
 * @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2004-2005  Jonathan Gotti
+* @copyleft (l) 2004-2007  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 */
@@ -60,7 +60,7 @@ class sampledb extends db{
   */
   function optimize($table){}
   function error_no(){}
-  function error_str(){}
+  function error_str($errno=null){}
   function __destruct(){
     parent::__destruct();
   }
