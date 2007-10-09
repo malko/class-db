@@ -8,9 +8,7 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
-*                           to ease the way of getting uniques db instances for each db
-*            - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow 
+* @changelog - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow 
 *                           the use of function, wild char or alias in fields list. 
 *                           will perhaps permit this again with a more effective regex in the future.
 *                           so at this time it's up to you to use this method as needed on any select_* method (still applyed for insert and update)
@@ -24,107 +22,51 @@
 */
 
 class db{
-	/** array of instances already created, one for each connection strings */
-	static protected $instances = array();
-	/** the default connection to use */
-	static public $defaultConnStr = null;
 	
 	/**Db hostname*/
-	public $host = null;
+	var $host = null;
 	/**mysql username*/
-	public $user = null;
+	var $user = null;
 	/**mysql password*/
-	public $pass = null;
+	var $pass = null;
 
 	/**resource connection (same as $conn if not applicable)*/
-	public $conn = null;
+	var $conn = null;
 	/**resource db selected*/
-	public $db = null ;
+	var $db = null ;
 
 	/**selected database*/
-	public $dbname = '';
+	var $dbname = '';
 
 	/** resource result handler*/
-	public $last_qres = null;
+	var $last_qres = null;
 	/**array of last query to array results*/
-	public $last_q2a_res = array();
+	var $last_q2a_res = array();
 	/**array of error number and msgs*/
-	public $error = array();
+	var $error = array();
 	/**the last error array*/
-	public $last_error = array();
+	var $last_error = array();
 
-	public $beverbose = FALSE;
-	public $autoconnect = TRUE;
+	var $beverbose = FALSE;
+	var $autoconnect = TRUE;
 	/** 
 	*chr to protect fields names in queries
 	*@private 
 	*/
-	public $_protect_fldname = '`';
-  
-  /**
-  * return a single instance of the database corresponding to the given connection String.
-  * This method must be copyed in the exended class as php is not able to get the name of the calling class (one more poor aspect of this language). 
-  * @param string $connectionStr the connection string is a semi colon separated list 
-  *                              of connection parameter in the order they appear in the constructor
-  *                              preceeded by classname://
-  *                              for exemple a mysqldb connection string will look like:
-  *                              "mysqldb://dbname;dbhost:port;dbuser;dbpass"
-  *                              and a sqlitedb one will look like:
-  *                              "sqlitedb://dbfile;mode"
-  * @param bool $setDefault      if true then this database connection will be the default one
-  *                              returned when no arguments are given. 
-  *                              For conveniance the first call to this method 
-  *                              will set the corresponding instance the default one 
-  *                              if none has been set before
-  * @return db instance
-  */
-  static public function getInstance($connectionStr=null,$setDefault=false){
-    if( is_null(self::$defaultConnStr) ){
-      if(is_null($connectionStr))
-        throw new Exception(__class__." Can't return an instance without any valid connection string.");
-      self::$defaultConnStr = $connectionStr;
-    }
-    if(is_null($connectionStr))
-      $connectionStr = self::$defaultConnStr;
-    if(isset(self::$instances[$connectionStr]))
-      return self::$instances[$connectionStr];
-    list($class,$params) = explode('://',$connectionStr);
-    $params = explode(';',$params);
-    $paramNb = count($params);
-    for($i=0;$i<$paramNb;++$i){
-      $pEval[] = "\$params[$i]";
-    }
-    eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
-    return self::$instances[$connectionStr] = $instance;
-  }
-  
-  static public function setDefaultConnectionStr($connectionStr){
-    self::$defaultConnStr = $connectionStr;
-  }
-  /**
-  * This way of creating an instance is not encourage anymore!
-  * @deprecated use @see getInstance instead
-  * constructor stay public even if we have getInstance for 2 reason
-  * 1- backward compatibility with existing scripts
-  * 2- permit getInstance to create any derived class without redefining it in each subclass
-  */
-	public function __construct(){
+	var $_protect_fldname = '`';
+
+	function db(){
 		if($this->autoconnect)
 			$this->open();
 	}
-  
-  public function __destruct(){
-    foreach( self::$instances as $db)
-      $db->close();
-    $this->close(); #- close current object connection if not obtained by getInstance
-  }
+
 	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
 
 	/** open connection to database */
-	public function open(){}
+	function open(){}
 
 	/** close connection to previously opened database */
-	public function close(){}
+	function close(){}
 	/**
 	* Select the database to work on (it's the same as the use db command or mysql_select_db function)
 	* @param string $dbname
@@ -135,16 +77,16 @@ class db{
 	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
 	* @see sqlitedb or mysqldb implementation for exemple
 	*/
-	public function fetch_res($result_set,$result_type='ASSOC'){}
+	function fetch_res($result_set,$result_type='ASSOC'){}
 
-	public function last_insert_id(){}
+	function last_insert_id(){}
 
 	/**
 	* base method you should replace this one in the extended class, to use the appropriate escape func regarding the database implementation
 	* @param string $quotestyle (both/single/double) which type of quote to escape
 	* @return str
 	*/
-	public function escape_string($string,$quotestyle='both'){
+	function escape_string($string,$quotestyle='both'){
 		$escapes = array("\x00", "\x0a", "\x0d", "\x1a", "\x09","\\");
 		$replace = array('\0',   '\n',    '\r',   '\Z' , '\t',  "\\\\");
 		switch(strtolower($quotestyle)){
@@ -178,7 +120,7 @@ class db{
 	* @param string $Q_str
 	* @return= result id | FALSE
 	**/
-	public function query($Q_str){}
+	function query($Q_str){}
 
 	/**
 	* perform a query on the database like query but return the affected_rows instead of result
@@ -193,7 +135,7 @@ class db{
 	* get the table list from $this->dbname
 	* @return array
 	*/
-	public function list_tables(){}
+	function list_tables(){}
 	/**
 	* return the list of field in $table
 	* @param string $table name of the sql table to work on
@@ -201,20 +143,20 @@ class db{
 	*                           (indexed by fieldname instead of int if false)
 	* @return array
 	*/
-	public function list_table_fields($table,$extended_info=FALSE){}
+	function list_table_fields($table,$extended_info=FALSE){}
 
 	/** Verifier si cette methode peut s'appliquer a SQLite */
-	public function show_table_keys($table){}
+	function show_table_keys($table){}
 
 	/**
 	* optimize table statement query
 	* @param string $table name of the table to optimize
 	* @return bool
 	*/
-	public function optimize($table){}
+	function optimize($table){}
 
-	public function error_no(){}
-	public function error_str($errno=null){}
+	function error_no(){}
+	function error_str($errno=null){}
 
 	###*** COMMON METHODS ***###
 
@@ -224,7 +166,7 @@ class db{
 	* @param string $result_type 'ASSOC', 'NUM' et 'BOTH' 
 	* @return array | false if no result
 	*/
-	public function query_to_array($Q_str,$result_type='ASSOC'){
+	function query_to_array($Q_str,$result_type='ASSOC'){
 		$this->last_q2a_res = array();
 		if(! $this->query($Q_str)){
 			$this->set_error(__FUNCTION__);
@@ -241,7 +183,7 @@ class db{
 	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH' 
 	* @Return  array | false
 	**/
-	public function select_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
+	function select_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
 		//we make the table list for the Q_str
 		if(! $tb_str = $this->array_to_str($tables))
 			return FALSE;
@@ -261,7 +203,7 @@ class db{
 	* @see select_to_array for details
 	* @return array of fields
 	*/
-	public function select_single_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
+	function select_single_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
 		if(! $res = $this->select_to_array($tables,$fields,$conds,$result_type))
 			return FALSE;
 		return $res[0];
@@ -270,7 +212,7 @@ class db{
 	* just a quick way to do a select_to_array followed by a associative_array_from_q2a_res
 	* see both thoose method for more information about parameters or return values
 	*/
-	public function select2associative_array($tables,$fields='*',$conds=null,$index_field='id',$value_fields=null,$keep_index=FALSE){
+	function select2associative_array($tables,$fields='*',$conds=null,$index_field='id',$value_fields=null,$keep_index=FALSE){
 		if(! $this->select_to_array($tables,$fields,$conds))
 			return FALSE;
 		return $this->associative_array_from_q2a_res($index_field,$value_fields,null,$keep_index);
@@ -282,7 +224,7 @@ class db{
 	* @param mixed conds
 	* @return mixed or FALSE
 	*/
-	public function select_single_value($table,$field,$conds=null){
+	function select_single_value($table,$field,$conds=null){
 		if($res = $this->select_single_to_array($table,$field,$conds,'NUM'))
 			return $res[0];
 		else
@@ -295,7 +237,7 @@ class db{
 	* @param mixed  $conds 
 	* @return array or FALSE
 	*/
-	public function select_field_to_array($table,$field,$conds=null){
+	function select_field_to_array($table,$field,$conds=null){
 		$conds_str = $this->process_conds($conds);
 		$Q_str = "SELECT $field FROM $table $conds_str";
 		if(! $res = $this->query_to_array($Q_str,'NUM') )
@@ -309,7 +251,7 @@ class db{
 	/**
 	* @return array  array((array) results,(str) navigationstring, (int) totalrows)
 	*/
-	public function select_array_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10){
+	function select_array_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10){
 		$conds = $this->process_conds($conds);
 		if(! ($tot = $this->select_single_value($table,'count(*)',$conds) ) )
 			return FALSE;
@@ -384,7 +326,7 @@ class db{
 	*@param array $attrs
 	*@return array
 	*/
-	public function set_slice_attrs($attrs=null){
+	function set_slice_attrs($attrs=null){
 		static $sliceAttrs;
 		if(! isset($sliceAttrs) ){
 			$sliceAttrs = array( 'first' => "<a href=\"%lnk\" class=\"pagelnk\"><<</a>",
@@ -413,7 +355,7 @@ class db{
 	* @param bool $return_id the function will return the inserted_id if $return_id is true (the default value), else it'll return only true or false.
 	* @return insert id or FALSE
 	**/
-	public function insert($table,$values,$return_id=TRUE){
+	function insert($table,$values,$return_id=TRUE){
 		if(!is_array($values))
 			return FALSE;
 		$fld = $this->protect_field_names(array_keys($values));
@@ -431,7 +373,7 @@ class db{
 	* @param mixed $conds
 	* @return int affected_rows
 	**/
-	public function delete($table,$conds=null){
+	function delete($table,$conds=null){
 		$conds_str = $this->process_conds($conds);
 		$Q_str = "DELETE FROM $table $conds_str";
 		if(method_exists($this,'query_affected_rows')){
@@ -451,7 +393,7 @@ class db{
 	* @param string|array $values ( 'fld=value, fld2=value2' arr(FLD=>VALUE,))
 	* @return int affected_rows or bool (depends on the database implementation (have we a query_affected_rows or not?))
 	**/
-	public function update($table,$values,$conds = null){
+	function update($table,$values,$conds = null){
 		if(is_array($values)){
 			$str = array();
 			foreach( $values as $k=>$v)
@@ -475,7 +417,7 @@ class db{
 	* @param string $table table name
 	* @return int
 	*/
-	public function get_count($table){
+	function get_count($table){
 		return $this->select_single_value($table,'count(*) as c');
 	}
 
@@ -489,7 +431,7 @@ class db{
 	*@param bool $sort_keys will automaticly sort the array by key if set to true @deprecated argument
 	*@return array
 	*/
-	public function associative_array_from_q2a_res($index_field='id',$value_fields=null,$res = null,$keep_index=FALSE,$sort_keys=FALSE){
+	function associative_array_from_q2a_res($index_field='id',$value_fields=null,$res = null,$keep_index=FALSE,$sort_keys=FALSE){
 		if($res===null)
 			$res = $this->last_q2a_res;
 		if(! is_array($res)){
@@ -527,8 +469,9 @@ class db{
 	* You can add a number before a ? to replace it by a given index in the array like 2? 
 	* @param string|array $conds
 	* @return string
+	* @private
 	*/
-	public function process_conds($conds=null){
+	function process_conds($conds=null){
 		if(is_string($conds) )
 			return $conds;
 		elseif(! is_array($conds) )
@@ -543,7 +486,7 @@ class db{
 	* used internally for smart params processing
 	* @private
 	*/
-	protected function prepare_smart_param($val){
+	function prepare_smart_param($val){
 		if(is_null($val)){
 			return 'NULL';
 		}elseif (is_int($val) || is_float($val)) {
@@ -559,8 +502,9 @@ class db{
 	/**
 	* used internally to prepare fields for queries 
 	* @param string|array $fields list of fields. it's up to you to protect fieldsname if you put in fields as string
+	* @private
 	*/
-	public function protect_field_names($fields){
+	function protect_field_names($fields){
 		if(is_array($fields)){
 			foreach($fields as $k=>$f)
 				$fields[$k] = $this->_protect_fldname.$f.$this->_protect_fldname;
@@ -574,11 +518,11 @@ class db{
 		return $fields?$fields:false;
 	}
 	
-	protected function array_to_str($var,$sep=','){
+	function array_to_str($var,$sep=','){
 		return (is_string($var)?$var:(is_array($var)?implode($sep,$var):''));
 	}
 
-	protected function set_error($callingfunc=null){
+	function set_error($callingfunc=null){
 		static $i=0;
 		if(! $this->db ){
 			$this->error[$i]['nb']  = null;
@@ -600,7 +544,7 @@ class db{
 	* @param string $string
 	* @private
 	*/
-	protected function verbose($string,$callingfunc=null){
+	function verbose($string,$callingfunc=null){
 		if($this->beverbose)
 			echo (isset($this)?get_class($this):'db').($callingfunc?"::$callingfunc ":' ')."=> $string\n";
 	}
@@ -614,7 +558,7 @@ class db{
 	* @param string $table name of the sql table to work on
 	* @param bool $extended_info will return the result of a show field query in a query_to_array fashion
 	*/
-	public function get_fields($table,$extended_info=FALSE){
+	function get_fields($table,$extended_info=FALSE){
 		return $this->list_table_fields($table,$extended_info);
 	}
 
@@ -626,8 +570,12 @@ class db{
 	* @param bool $indexed_by_name the return array will be indexed by the fields name if set to true (default is FALSE)
 	* @return array
 	*/
-	public function list_fields($table,$indexed_by_name=FALSE){
+	function list_fields($table,$indexed_by_name=FALSE){
 		return $this->list_table_fields($table,TRUE);
+	}
+
+	function __destruct(){
+		$this->close();
 	}
 
 }
