@@ -8,7 +8,9 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
+* @changelog - 2007-10-11 - change default curpage for an input in set_slice_attrs()
+*                         - no more autoload of console_app when not in sapi cli
+*            - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
 *                           to ease the way of getting uniques db instances for each db
 *            - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow 
 *                           the use of function, wild char or alias in fields list. 
@@ -114,8 +116,10 @@ class db{
 	}
   
   public function __destruct(){
-    foreach( self::$instances as $db)
-      $db->close();
+    foreach( self::$instances as $k=>$db){
+      self::$instances[$k]->close();
+      unset($db,self::$instances[$k]);
+    }
     $this->close(); #- close current object connection if not obtained by getInstance
   }
 	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
@@ -392,7 +396,8 @@ class db{
 														'next'  => "<a href=\"%lnk\" class=\"pagelnk\">></a>",
 														'last'   => "<a href=\"%lnk\" class=\"pagelnk\">>></a>",
 														'pages'  => "<a href=\"%lnk\" class=\"pagelnk\">%page</a>",
-														'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
+														#- 'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
+														'curpage'  => '<input type="text" value="%page" onfocus="this.value=\'\';" onkeydown="if(event.keyCode==13){ var p=parseInt(this.value)||1;window.location=\'%lnk\'.replace(/page=%page/,\'page=\'+(p>%nbpages?%nbpages:(p<1?1:p)));return false;}" size="3" title="aller &agrave; la page" style="text-align:center;" />',
 														'linkStr'  => "?page=%page",
 														'linkSep'  => " ",
 														'formatStr'=> " %first %prev %5links %next %last"
@@ -588,7 +593,7 @@ class db{
 			$this->error[$i]['str'] = $this->error_str($this->error[$i]['nb']);
 		}
 		$this->last_error = $this->error[$i];
-		if(class_exists('console_app') && php_sapi_name()=='cli')
+		if( php_sapi_name()=='cli' && class_exists('console_app',false))
 			$this->verbose(console_app::tagged_string($this->error[$i]['str'],'red|bold'),$callingfunc);
 		else
 			$this->verbose($this->error[$i]['str'],$callingfunc);

@@ -17,7 +17,8 @@
 * @todo ameliorer query_to_array constants (Num/ASSOC/BOTH) (supporter les constantes en + des chaines)
 */
 
-require(dirname(__file__).'/class-db.php');
+if(! class_exists('db') )
+  require(dirname(__file__).'/class-db.php');
 
 class mysqldb extends db{
   function mysqldb($dbname,$dbhost='localhost',$dbuser='root',$dbpass=''){ # most common config ?
@@ -104,7 +105,7 @@ class mysqldb extends db{
 	* @see sqlitedb or mysqldb implementation for exemple
 	* @return array
   */
-	function fetch_res($result_set,$result_type){
+	function fetch_res($result_set,$result_type='ASSOC'){
     $result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
