@@ -6,7 +6,8 @@
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first version
-* @changelog - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more logical to me)
+* @changelog - 2007-11-20 - changing call to vebose() method according to changed made in class-db
+*            - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more logical to me)
 *            - 2007-01-12 - now dump_to_file() use method escape_string instead of mysql_escape_string
 *            - 2005-02-28 - add method optimize 
 *            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results 
@@ -50,7 +51,7 @@ class mysqldb extends db{
     if($dbname)
       $this->dbname = $dbname;
     if(! $this->db = mysql_select_db($this->dbname,$this->conn)){
-      $this->verbose("FATAL ERROR CAN'T CONNECT TO database ".$this->dbname);
+      $this->verbose("can't connect to database ".$this->dbname,__FUNCTION__,1);
       $this->set_error(__FUNCTION__);
       return FALSE;
     }else{
@@ -75,10 +76,10 @@ class mysqldb extends db{
         default:
         case 'active':
           if(! $this->conn = @mysql_connect($this->host,$this->user,$this->pass)){
-            $this->verbose("CONNECTION TO $this->host FAILED");
+            $this->verbose("connection to $this->host failed",__FUNCTION__,1);
             return FALSE;
           }
-          $this->verbose("CONNECTION TO $this->host ESTABLISHED");
+          $this->verbose("connection to $this->host established",__FUNCTION__,2);
           $this->select_db();
           return @mysql_get_host_info($this->conn);
           break;
@@ -162,8 +163,7 @@ class mysqldb extends db{
       if(! ($this->autoconnect && $this->check_conn('check')))
         return FALSE;
     }
-		if($this->beverbose)
-			echo "$Q_str\n";
+		$this->verbose($Q_str,__FUNCTION__,2);
     if(! $this->last_qres = mysql_query($Q_str,$this->conn))
       $this->set_error(__FUNCTION__);
     return $this->last_qres;

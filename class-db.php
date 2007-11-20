@@ -8,7 +8,10 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-10-11 - change default curpage for an input in set_slice_attrs()
+* @changelog - 2007-11-20 - now beverbose property is int instead of bool and can takes 4 values
+*                           0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
+*                           (don't forget to change true by 1 in your scripts or you won't have any output anymore)
+*            - 2007-10-11 - change default curpage for an input in set_slice_attrs()
 *                         - no more autoload of console_app when not in sapi cli
 *            - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
 *                           to ease the way of getting uniques db instances for each db
@@ -55,7 +58,13 @@ class db{
 	/**the last error array*/
 	public $last_error = array();
 
-	public $beverbose = FALSE;
+	/** 
+  * set the level of verbosity. 
+  * It MUST be an integar not a string or nothing will output!!!!
+  * 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors 
+	*/
+	public $beverbose = 0;
+	
 	public $autoconnect = TRUE;
 	/** 
 	*chr to protect fields names in queries
@@ -498,12 +507,12 @@ class db{
 		if($res===null)
 			$res = $this->last_q2a_res;
 		if(! is_array($res)){
-			$this->verbose("[error] db::associative_array_from_q2a_res with invalid result\n");
+			$this->verbose("associative_array_from_q2a_res with invalid result",__FUNCTION__,1);
 			return FALSE;
 		}
 		# then verify index exists
 		if(!isset($res[0][$index_field])){
-			$this->verbose("[error] db::associative_array_from_q2a_res with invalid index field '$index_field'\n");
+			$this->verbose("associative_array_from_q2a_res with invalid index field '$index_field'",__FUNCTION__,1);
 			return FALSE;
 		}
 		# then we do the trick
@@ -593,21 +602,38 @@ class db{
 			$this->error[$i]['str'] = $this->error_str($this->error[$i]['nb']);
 		}
 		$this->last_error = $this->error[$i];
-		if( php_sapi_name()=='cli' && class_exists('console_app',false))
-			$this->verbose(console_app::tagged_string($this->error[$i]['str'],'red|bold'),$callingfunc);
-		else
-			$this->verbose($this->error[$i]['str'],$callingfunc);
+    $this->verbose($this->error[$i]['str'],$callingfunc,1);
 		$i++;
 	}
 
 	/**
 	* print a msg on STDOUT if $this->beverbose is set to true
-	* @param string $string
+	* @param string $msg         message output string
+	* @param string $callingFunc name of the calling function
+	* @param int $msgLvl         the level corresponding to the message
+	*                            1-> error message
+	*                            2-> query or similar informative message
+	*                            msgLvl must be an int not a string as it will be test by type
 	* @private
 	*/
-	protected function verbose($string,$callingfunc=null){
-		if($this->beverbose)
-			echo (isset($this)?get_class($this):'db').($callingfunc?"::$callingfunc ":' ')."=> $string\n";
+	protected function verbose($msg,$callingFunc=null,$msgLvl=1){
+	  if(! $this->beverbose) 
+	    return;
+    if( ($msgLvl===2 && $this->beverbose >=2) || ($msgLvl === 1 && $this->beverbose !== 2) ){
+      $msg = get_class($this).($callingFunc?"::$callingFunc":'').' => '.$msg;
+      $useConsoleApp = ( php_sapi_name()=='cli' && class_exists('console_app',false))?true:false;
+      $isError = $msgLvl===1?true:false;
+      if($isError){
+        $msg = '[ERROR] '.$msg;
+        if($useConsoleApp)
+          return console_app::msg_error($msg);
+        echo "<b style=\"color:red;\">$msg</b><br />\n";
+      }else{
+        if($useConsoleApp)
+          return console_app::msg_info($msg);
+        echo "<b style=\"color:blue;\">$msg</b><br />\n";
+      }
+    }
 	}
 
 	###*** DEPRECATED METHODS ***###
