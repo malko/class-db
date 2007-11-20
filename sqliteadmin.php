@@ -2,13 +2,16 @@
 <?php
 /**
 * Sqlite Admin tool
-* @changelog - 2007-07-17 - now can export a query to a csv file
+* @changelog - 2007-10-03 - remove some warning errors
+*                         - add the whole last multiline command to history
+*                         - if no HISTSIZE value is found in $_SERVER then default to console_app::$historyMaxLen
+*            - 2007-07-17 - now can export a query to a csv file
 *            - 2007-04-19 - start php5 port
 */
 error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
-require('Console_app.php');
+require('../console_app/class-console_app.php');
 # require('class-db.php');
 require('./class-sqlitedb.php');
 # return to original path
@@ -52,7 +55,7 @@ if(! is_file($dbfile) ){
 }
 $mode = $app->get_arg('mode');
 # create a sqlitedb object
-$db = &new sqlitedb($dbfile,'r');
+$db = new sqlitedb($dbfile,'r');
 $db->beverbose = $app->get_arg('verbose');
 $db->buffer_on = $app->get_arg('buffer');
 
@@ -62,32 +65,36 @@ $protect   = '';
 
 $_cmdBuff = '';
 while(TRUE){
-	$read = console_app::read('>',null,FALSE);
-	# break;
-	@list($cmd,$args) = explode(' ',trim($read),2);
-	switch(strtolower($cmd)){
-		case 'exit':
-		case 'quit':
-		case 'q':
-			$db->close();
-			break 2;
-		case 'tb': $cmd = 'show';$args='tables;';
-		case 'show':
-			if(preg_match('!^tables\s*;$!i',strtolower(trim($args)))){
-				if(! $res = $db->list_tables())
-					console_app::msg_error("No Tables in database create some first!");
-				foreach($res as $table)
-					$tables[]=array('table name'=>$table,'nb row'=>$db->get_count($table));
-				console_app::print_table($tables);unset($tables);
-			}elseif(preg_match('!^(\w+)\s+fields\s*;$!i',strtolower(trim($args)),$m)){
-				if(! $res = $db->list_table_fields($m[1]))
-					console_app::msg_error($db->last_error['str']);
+  $read = console_app::read('>',null,FALSE);
+  # break;
+  @list($cmd,$args) = explode(' ',trim($read),2);
+  switch(strtolower($cmd)){
+    case 'exit':
+    case 'quit':
+    case 'q':
+      $db->close();
+      break 2;
+    case 'tb': $cmd = 'show';$args='tables;';
+    case 'show':
+      if(preg_match('!^tables\s*;$!i',strtolower(trim($args)))){
+        if(! $res = $db->list_tables()){
+          console_app::msg_error("No Tables in database create some first!");
+        }else{
+          foreach($res as $table)
+            $tables[]=array('table name'=>$table,'nb row'=>$db->get_count($table));
+          console_app::print_table($tables);unset($tables);
+        }
+      }elseif(preg_match('!^(\w+)\s+fields\s*;$!i',strtolower(trim($args)),$m)){
+        if(! $res = $db->list_table_fields($m[1])){
+          console_app::msg_error($db->last_error['str']);
+        }else{
         # console_app::show($res);
-				foreach($res as $field)
-					$fields[]=array('field name'=>$field);
-				console_app::print_table($fields);unset($fields);
-			}
-			break;
+          foreach($res as $field)
+            $fields[]=array('field name'=>$field);
+          console_app::print_table($fields);unset($fields);
+        }
+      }
+      break;
     case 'import': # import from a csv file
       if(! preg_match('!^\s*(.*)\s+(\S+)(?:\s*;)?$!',trim($args),$m) ){
         console_app::msg_error("What do you mean?");
@@ -122,16 +129,16 @@ while(TRUE){
       if($inserterr) console_app::msg("$inserterr rows can't be inserted",'red');
       break;
     case 'export': # export a table to csv
-			if(preg_match('!(select\s*.+?;)\s*([^;]+)$!i',trim($args),$m)){
-				list(,$qStr,$filename) = $m;
-				$res = $db->query_to_array($qStr);
-			}else{
-				list($table,$filename) = preg_split("!\s+!",$args,2);
-				$res = $db->select_to_array($table);
-			}
+      if(preg_match('!(select\s*.+?;)\s*([^;]+)$!i',trim($args),$m)){
+        list(,$qStr,$filename) = $m;
+        $res = $db->query_to_array($qStr);
+      }else{
+        list($table,$filename) = preg_split("!\s+!",$args,2);
+        $res = $db->select_to_array($table);
+      }
       if(! $res ){
-				console_app::msg("No Result!");
-			}else{
+        console_app::msg("No Result!");
+      }else{
         if(! $f= fopen(trim($filename),'w') ){
           console_app::msg_error("Can't open $filename for writing");
           break;
@@ -158,66 +165,72 @@ while(TRUE){
     case 'vacuum':
       $db->optimize(str_replace(';','',$args));
       break;
-		case 'master':
-			console_app::print_table($db->query_to_array('SELECT * FROM SQLITE_MASTER'));
-			break;
-		case 'select':
-			$Q_str = check_query($read);
-			# $app->show($Q_str);
-			if(! $res = $db->query_to_array($Q_str))
-				console_app::msg("No Result!");
-			else
-				console_app::print_table($res);
-			break;
-		case 'insert':
-		case 'delete':
-		case 'create':
-		case 'drop':
-		case 'update':
-			$Q_str = check_query($read);
-			perform_query($Q_str);
-			break;
+    case 'master':
+      console_app::print_table($db->query_to_array('SELECT * FROM SQLITE_MASTER'));
+      break;
+    case 'select':
+      $Q_str = check_query($read);
+      # $app->show($Q_str);
+      if(! $res = $db->query_to_array($Q_str))
+        console_app::msg("No Result!");
+      else
+        console_app::print_table($res);
+      break;
+    case 'insert':
+    case 'delete':
+    case 'create':
+    case 'drop':
+    case 'update':
+      $Q_str = check_query($read);
+      perform_query($Q_str);
+      break;
     case 'help':
     case 'h':
     case '?':
       display_help();
       break;
-		case '';
-			if(console_app::msg_confirm("Exit SQLiteAdmin ?"))
-				break 2;
-			break;
-		default:
-			echo "'$read'\n";
-			console_app::msg("Unknown command");
-	}
+    case '';
+      if(console_app::msg_confirm("Exit SQLiteAdmin ?"))
+        break 2;
+      break;
+    default:
+      echo "'$read'\n";
+      console_app::msg("Unknown command");
+  }
 }
 if( function_exists('readline') )
-	save_history($history_file);
+  save_history($history_file);
 
 function check_query($query){
-	global $app;
-	$buff='';
-	if( substr(trim($query),-1)==';' ){
-		return $query;
-	}else{
-		$buff .= $query;
-		while(TRUE){
-			$query = console_app::read('',null,FALSE);
-			if( substr(trim($query),-1)==';' )
-				break;
-			$buff .= $query.' ';
-		}
-		return $buff.$query;
-	}
+  global $app;
+  $buff='';
+  if( substr(trim($query),-1)==';' ){
+    return history_append_multiline($query);
+  }else{
+    $buff .= $query;
+    while(TRUE){
+      $query = console_app::read('',null,FALSE);
+      if( substr(trim($query),-1)==';' )
+        break;
+      $buff .= $query.' ';
+    }
+    return history_append_multiline($buff.$query);
+  }
+}
+
+function history_append_multiline($cmd){
+  if( function_exists('readline_add_history'))
+    readline_add_history($cmd);
+  return $cmd;
 }
 
 function perform_query($query){
-	global $app,$db;
-	echo "Perform: $query\n";
-	if( ($ct = $db->query_affected_rows($query))===FALSE)
-		return console_app::msg_error("Error");
-	console_app::msg("Ok $ct rows changed",'green');
-	return TRUE;
+  global $app,$db;
+  echo "Perform: $query\n";
+  if( ($ct = $db->query_affected_rows($query))===FALSE)
+    return console_app::msg_error("Error");
+  console_app::msg("Ok $ct rows changed",'green');
+  return TRUE;
 }
 
 function display_help(){
@@ -228,11 +241,11 @@ tb,show tablename                 will list tables in the databases
 show tablename fields             will list fields in table tablename
 vacuum tablename                  optimize a table
 master                            display the content of SQLITE_MASTER
-SQL statements                    perform a query on the database such as select, 
-                                  insert update or delete
+SQL statements                    perform a query on the database such as 
+                                  select, insert update or delete
 export tablename filename         export the given table as a csv file
-export SQL statements; filname    export the given query as csv to filename 
-															    ( don't forget the ';' at the end of the query
+export SQL statements; filename   export the given query as csv to filename
+                                  (don't forget the ';' at the end of query)
 import filename tablename         import the given csv file in table
 ";
 }
@@ -281,8 +294,9 @@ function save_history($history_file){
   }
   # nettoyage de l'historique
   $hist = readline_list_history();
-  if( ($histsize = count($hist)) > $_SERVER['HISTSIZE'] ){
-    $hist = array_slice($hist, $histsize - $_SERVER['HISTSIZE']);
+  $histMaxSize = isset($_SERVER['HISTSIZE'])?$_SERVER['HISTSIZE']:console_app::$historyMaxLen;
+  if( ($histsize = count($hist)) > $histMaxSize ){
+    $hist = array_slice($hist, $histsize - $histMaxSize);
     if(! $fhist = fopen($history_file,'w') ){
       console_app::msg_error("Can't open history file");
     }else{
@@ -293,31 +307,30 @@ function save_history($history_file){
 }
 
 function autocompletion(){
-	global $db;
-	static $completion;
-	# console_app::show(func_get_args());
-	if(! isset( $completion)){
-	  if( $tables = $db->list_tables())
-			foreach($tables as $table){
-				$completion[] = $table;
-				if($fields = $db->list_table_fields($table,FALSE))
-					foreach($fields as $fld)
-						$completion[] = $fld;
-				
-			}
-	}
-	return $completion;
+  global $db;
+  static $completion;
+  # console_app::show(func_get_args());
+  if(! isset( $completion)){
+    if( $tables = $db->list_tables())
+      foreach($tables as $table){
+        $completion[] = $table;
+        if($fields = $db->list_table_fields($table,FALSE))
+          foreach($fields as $fld)
+        $completion[] = $fld;
+      }
+  }
+  return $completion;
 }
 ##### ARGS VALIDATION FUNCTIONS #####
 function valid_mode($mode){
-	if(! in_array($mode,array('r','w','0666','0444')) )
-		return FALSE;
-	switch($mode){
-		case '0444':
-			return 'r';
-		case '0666':
-			return 'w';
-	}
+  if(! in_array($mode,array('r','w','0666','0444')) )
+    return FALSE;
+  switch($mode){
+    case '0444':
+      return 'r';
+    case '0666':
+      return 'w';
+  }
 }
 
 ?>
