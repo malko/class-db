@@ -8,9 +8,13 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-11-20 - now beverbose property is int instead of bool and can takes 4 values
+* @changelog - 2008-02-19 - now get_count() method can receive optional clause as second parameter
+*                         - add method _call() and static property db::$aliases to support methods aliases to be user defined (you can set your own aliases for any methods)
+*                         - rename most of select_* methods with 'better' name (shorter and better meaning I hope) But old names will work just fine with new methods aliases support
+*            - 2007-11-20 - now beverbose property is int instead of bool and can takes 4 values
 *                           0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
-*                           (don't forget to change true by 1 in your scripts or you won't have any output anymore)
+*                           (don't forget to change true by 1 in your scripts or you won't have expected output anymore)
+*                         - remove call to set_error() in query_to_array only query has to do it
 *            - 2007-10-11 - change default curpage for an input in set_slice_attrs()
 *                         - no more autoload of console_app when not in sapi cli
 *            - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
@@ -33,6 +37,19 @@ class db{
 	static protected $instances = array();
 	/** the default connection to use */
 	static public $defaultConnStr = null;
+	/**
+	* define methods aliases
+	* define your own like this db::$aliases[alias] = 'realMethodName';
+	*/
+	static public $aliases = array(
+		/** aliases required to keep backward compatibility */
+		'select_to_array'          => 'select_rows',
+		'select_single_to_array'   => 'select_row',
+		'select2associative_array' => 'select_associative',
+		'select_single_value'      => 'select_value',
+		'select_array_slice'       => 'select_slice',
+		'select_field_to_array'    => 'select_col',
+	);
 	
 	/**Db hostname*/
 	public $host = null;
@@ -130,6 +147,11 @@ class db{
       unset($db,self::$instances[$k]);
     }
     $this->close(); #- close current object connection if not obtained by getInstance
+  }
+
+	function __call($m,$a){
+		if( isset(self::$aliases[$m]) )
+			return call_user_func_array(array($this,self::$aliases[$m]),$a);
   }
 	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
 
@@ -240,7 +262,6 @@ class db{
 	public function query_to_array($Q_str,$result_type='ASSOC'){
 		$this->last_q2a_res = array();
 		if(! $this->query($Q_str)){
-			$this->set_error(__FUNCTION__);
 			return FALSE;
 		}
 		return $this->last_q2a_res = $this->fetch_res($this->last_qres,$result_type);
@@ -254,7 +275,7 @@ class db{
 	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH' 
 	* @Return  array | false
 	**/
-	public function select_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
+	public function select_rows($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
 		//we make the table list for the Q_str
 		if(! $tb_str = $this->array_to_str($tables))
 			return FALSE;
@@ -269,22 +290,22 @@ class db{
 		return $this->query_to_array($Q_str,$result_type);
 	}
 	/**
-	* Same as select_to_array but return only the first row.
-	* equal to $res = select_to_array followed by $res = $res[0];
-	* @see select_to_array for details
+	* Same as select_rows but return only the first row.
+	* equal to $res = select_rows followed by $res = $res[0];
+	* @see select_rows for details
 	* @return array of fields
 	*/
-	public function select_single_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
-		if(! $res = $this->select_to_array($tables,$fields,$conds,$result_type))
+	public function select_row($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
+		if(! $res = $this->select_rows($tables,$fields,$conds,$result_type))
 			return FALSE;
 		return $res[0];
 	}
 	/**
-	* just a quick way to do a select_to_array followed by a associative_array_from_q2a_res
+	* just a quick way to do a select_rows followed by a associative_array_from_q2a_res
 	* see both thoose method for more information about parameters or return values
 	*/
-	public function select2associative_array($tables,$fields='*',$conds=null,$index_field='id',$value_fields=null,$keep_index=FALSE){
-		if(! $this->select_to_array($tables,$fields,$conds))
+	public function select_associative($tables,$fields='*',$conds=null,$index_field='id',$value_fields=null,$keep_index=FALSE){
+		if(! $this->select_rows($tables,$fields,$conds))
 			return FALSE;
 		return $this->associative_array_from_q2a_res($index_field,$value_fields,null,$keep_index);
 	}
@@ -295,8 +316,8 @@ class db{
 	* @param mixed conds
 	* @return mixed or FALSE
 	*/
-	public function select_single_value($table,$field,$conds=null){
-		if($res = $this->select_single_to_array($table,$field,$conds,'NUM'))
+	public function select_value($table,$field,$conds=null){
+		if($res = $this->select_row($table,$field,$conds,'NUM'))
 			return $res[0];
 		else
 			return FALSE;
@@ -308,7 +329,7 @@ class db{
 	* @param mixed  $conds 
 	* @return array or FALSE
 	*/
-	public function select_field_to_array($table,$field,$conds=null){
+	public function select_col($table,$field,$conds=null){
 		$conds_str = $this->process_conds($conds);
 		$Q_str = "SELECT $field FROM $table $conds_str";
 		if(! $res = $this->query_to_array($Q_str,'NUM') )
@@ -322,12 +343,12 @@ class db{
 	/**
 	* @return array  array((array) results,(str) navigationstring, (int) totalrows)
 	*/
-	public function select_array_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10){
+	public function select_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10){
 		$conds = $this->process_conds($conds);
-		if(! ($tot = $this->select_single_value($table,'count(*)',$conds) ) )
+		if(! ($tot = $this->select_value($table,'count(*)',$conds) ) )
 			return FALSE;
 		$limitStart = (int) $pageNbRows * ($pageId-1);
-		$res = $this->select_to_array($table,$fields,$conds." Limit $limitStart,$pageNbRows");
+		$res = $this->select_rows($table,$fields,$conds." Limit $limitStart,$pageNbRows");
 		# now prepare navigation links
 		$attrs = $this->set_slice_attrs();
 		extract($attrs);
@@ -487,18 +508,19 @@ class db{
 	/**
 	* get the number of row in $table
 	* @param string $table table name
+	* @param mixed  $conds
 	* @return int
 	*/
-	public function get_count($table){
-		return $this->select_single_value($table,'count(*) as c');
+	public function get_count($table,$conds=null){
+		return $this->select_value($table,'count(*) as c',$conds);
 	}
 
 	/**
 	*return an associative array indexed by $index_field with values $value_fields from
-	*a mysqldb->select_to_array result
+	*a mysqldb->select_rows result
 	*@param string $index_field default value is id
 	*@param mixed $value_fields (string field name or array of fields name default is null so keep all fields
-	*@param array $res the mysqldb->select_to_array result
+	*@param array $res the mysqldb->select_rows result
 	*@param bool $keep_index if set to true then the index field will be keep in the values associated (unused if $value_fields is string)
 	*@param bool $sort_keys will automaticly sort the array by key if set to true @deprecated argument
 	*@return array
@@ -624,10 +646,9 @@ class db{
       $useConsoleApp = ( php_sapi_name()=='cli' && class_exists('console_app',false))?true:false;
       $isError = $msgLvl===1?true:false;
       if($isError){
-        $msg = '[ERROR] '.$msg;
         if($useConsoleApp)
           return console_app::msg_error($msg);
-        echo "<b style=\"color:red;\">$msg</b><br />\n";
+        echo "<b style=\"color:red;\">[ERROR] $msg</b><br />\n";
       }else{
         if($useConsoleApp)
           return console_app::msg_info($msg);
