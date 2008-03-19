@@ -5,6 +5,8 @@
 * @changelog - 2008-03-19 - new possibility to call some callBack on tables to clean datas
 *                         - add some methods to help using mbstring on entire tables
 *                         - add support for use database command (only for mysqldb for now at least)
+*                         - add verbosity command
+*                         - now pagination on one page result + allow to change pagesize
 *                          (today's modifs are not the better code i can write, only the one i have time for)
 *            - 2007-12-19 - remove read/write mode argument and some other options
 *                         - add support for any db extended class
@@ -296,6 +298,12 @@ while(TRUE){
       $Q_str = check_query($read);
       perform_query($Q_str);
       break;
+    case 'verbosity':
+    	$db->beverbose = (int) $args;
+    	break;
+    case 'pagesize':
+    	$pageSize = (int) $args;
+    	break;
     case 'help':
     case 'h':
     case '?':
@@ -362,6 +370,14 @@ master                            display the content of SQLITE_MASTER
                                   (sqlitedb only)
 SQL statements                    perform a query on the database such as
                                   select, insert update or delete
+verbosity n                       change verbose level while inside the app
+pagesize n                        set the number of results by page
+
+###--- Paging commands (only when displaying results) ---###
+n                                 go directly to page n
+<, >, <<, >>                      respectively go to
+                                  previous, next, first and last page
+pagesize n                        set the number of results by page
 
 ###--- Import/Export datas from/to csv files ---###
 export tablename filename         export the given table as a csv file
@@ -428,9 +444,19 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   # on affiche le tableau:
   list($results,$nav,$total) = $res;
   console_app::print_table($results);
+
+  if($total<=$pageSize) # no navigation on unique page
+  	return;
+
   # affiche la navigation
   $e = console_app::read($nav);
   $lastPage = ceil($total/$pageSize);
+
+  if( preg_match('!^\s*pagesize (\d+)\s*!i',$e,$m) ){
+		$pageSize = (int) $m[1];
+		return printPagedTable($table,$fields,$conds,1);
+	}
+
   if( is_numeric($e) ){ # numero de page on rappel la fonction avec le num de page
     if($e < 1)
       $e = 1;
@@ -440,10 +466,10 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   }
 
   if( $e === '>' ) # page suivante
-    return printPagedTable($table,$fields,$conds,$pageId+1);
+    return printPagedTable($table,$fields,$conds,max($lastPage,$pageId+1));
 
   if( $e === '<' ) # page precedante
-    return printPagedTable($table,$fields,$conds,$pageId-1);
+    return printPagedTable($table,$fields,$conds,max(1,$pageId-1));
 
   if( $e === '<<' ) # first page
     return printPagedTable($table,$fields,$conds,1);
