@@ -176,12 +176,13 @@ while(TRUE){
 			# do conversion
 			if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$args,$m) ){
 				$tables = explode(',',$args);
+					$filter = null;
 			}else{
 				$tables = explode(',',$m[1]);
 				$filter = $m[2];
 			}
 			foreach($tables as $tb)
-				callbackOnTable('detectConvert',$tb);
+				callbackOnTable('detectConvert',$tb,$filter);
     	break;
     case 'maptable':
     	  @list($func,$tables) = preg_split('!\s+!',$args,2);
@@ -192,12 +193,13 @@ while(TRUE){
 				}
 				if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$tables,$m) ){
 					$tables = explode(',',$args);
+					$filter = null;
 				}else{
 					$tables = explode(',',$m[1]);
 					$filter = $m[2];
 				}
 				foreach($tables as $tb)
-					callbackOnTable($func,$tb);
+					callbackOnTable($func,$tb,$filter);
 				break;
     	break;
     case 'import': # import from a csv file
@@ -460,7 +462,7 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   list($results,$nav,$total) = $res;
   console_app::print_table($results);
 
-  if($total<=$pageSize) # no navigation on unique page
+  if($total <= $pageSize) # no navigation on unique page
   	return;
 
   # affiche la navigation
