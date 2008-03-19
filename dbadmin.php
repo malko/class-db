@@ -176,7 +176,7 @@ while(TRUE){
 			# do conversion
 			if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$args,$m) ){
 				$tables = explode(',',$args);
-					$filter = null;
+				$filter = null;
 			}else{
 				$tables = explode(',',$m[1]);
 				$filter = $m[2];
@@ -192,7 +192,7 @@ while(TRUE){
 					break;
 				}
 				if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$tables,$m) ){
-					$tables = explode(',',$args);
+					$tables = explode(',',$tables);
 					$filter = null;
 				}else{
 					$tables = explode(',',$m[1]);
