@@ -130,9 +130,11 @@ while(TRUE){
         if(! $res = $db->list_tables()){
           console_app::msg_error("No Tables in database create some first!");
         }else{
+        	$tables = array();
           foreach($res as $table)
             $tables[]=array('table name'=>$table,'nb row'=>$db->get_count($table));
-          console_app::print_table($tables);unset($tables);
+          console_app::print_table($tables);
+          unset($tables);
         }
       }elseif(preg_match('!^(\w+)\s+fields\s*;?$!i',$args,$m)){
         if(! $res = $db->list_table_fields($m[1])){
@@ -419,7 +421,10 @@ function callbackOnTable($callBack,$table,$filter=null){
 	$rows = $db->select_to_array($table,'*',$filter);
   if(! $rows )
   	return console_app::msg_info("no result from $table.");
+  console_app::progress_bar(0,"applying $callback on $table",count($rows));
+  $i=0;
   foreach($rows as $row){
+  	console_app::refresh_progress_bar(++$i);
   	$where = array('WHERE '.implode('=? AND ',array_keys($row)).'=?');
 		$where = array_merge($where,array_values($row));
 		$row = array_map($callBack,$row);
