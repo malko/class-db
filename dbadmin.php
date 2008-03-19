@@ -137,15 +137,18 @@ while(TRUE){
           console_app::print_table($tables);
           unset($tables);
         }
-      }elseif(preg_match('!^(\w+)\s+fields\s*;?$!i',$args,$m)){
-        if(! $res = $db->list_table_fields($m[1])){
+      }elseif(preg_match('!^(\w+)\s+fields(infos)?\s*;?$!i',$args,$m)){
+      	$extended = $m[2]?true:false;
+        if(! $res = $db->list_table_fields($m[1],$extended)){
           console_app::msg_error($db->last_error['str']);
-        }else{
-        # console_app::show($res);
-          foreach($res as $field)
-            $fields[]=array('field name'=>$field);
-          console_app::print_table($fields);unset($fields);
+          break;
         }
+        #- ~ console_app::show($res);
+				if(! $extended){
+					foreach($res as $k=>$field)
+						$res[$k]=array('Field'=>$field);
+				}
+				console_app::print_table($res);
       }elseif($db instanceof mysqldb && preg_match('!^d(bs|atabases)\s*;?$!i',$args) ){
 				if(! $res = $db->query_to_array("show databases"))
           console_app::msg("No databases!");
@@ -372,7 +375,8 @@ function display_help(){
 ###--- Common commands ---###
 ?,h,help will display this help.
 exit,quit,q                       quit application
-show tablename fields             will list fields in table tablename
+show tablename fields[infos]      will list fields in table tablename
+                                  with or without infos
 tb,show tablename                 will list tables in the databases
 show databases                    will list databases available on server
                                   (mysqldb only )
@@ -400,10 +404,11 @@ export SQL statements; filename   export the given query as csv to filename
 import filename tablename         import the given csv file in table
 
 ###--- Datas cleaning methods ---###
-maptable callback tablenames      allow you to array_map a phpfunction
-                                  on all datas in given tables
-                                  (multiple tablename can be separated by ',')
-mb_detectconvert tablenames       try to convert datas charset in given tables
+maptable callback tablename [filter:condition] [PK:field_primaryKey]
+                                  allow you to array_map a phpfunction
+                                  on all datas in given table
+mb_detectconvert tablename [filter:condition] [PK:field_primaryKey]
+                                  try to convert datas charset in given table
                                   this REQUIRE mbstring extension to be loaded
                                   and is totally independant of the database
                                   settings
@@ -435,10 +440,23 @@ function callbackOnTable($callBack,$table,$filter=null){
   	return console_app::msg_info("no result from $table.");
   console_app::progress_bar(0,"applying $callBack on $table",count($rows));
   $i=0;
+  #- ~ check for primary key
+  $fieldInfos = $db->list_table_fields($table,true);
+  $PK = false;
+  foreach($fieldInfos as $f){
+		if($f['Key']==='PRI'){
+			$PK = $f['Field'];
+			break;
+		}
+	}
   foreach($rows as $row){
   	console_app::refresh_progress_bar(++$i);
-  	$where = array('WHERE '.implode('=? AND ',array_keys($row)).'=?');
-		$where = array_merge($where,array_values($row));
+  	if($PK){
+  		$where = array("WHERE $PK=?",$row[$PK]);
+		}else{
+			$where = array('WHERE '.implode('=? AND ',array_keys($row)).'=?');
+			$where = array_merge($where,array_values($row));
+		}
 		$row = array_map($callBack,$row);
 		$db->update($table,$row,$where);
 		/**
