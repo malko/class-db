@@ -7,6 +7,7 @@
 *                         - add support for use database command (only for mysqldb for now at least)
 *                         - add verbosity command
 *                         - now pagination on one page result + allow to change pagesize
+*                         - verbose is not anymore a flag but an arg (forget last time)
 *                          (today's modifs are not the better code i can write, only the one i have time for)
 *            - 2007-12-19 - remove read/write mode argument and some other options
 *                         - add support for any db extended class
@@ -36,7 +37,7 @@ example connecting a sqlite database: sqlitedb://dbfile,mode
 if no database type is specified dbadmin will lookup for a sqlite local file.
 ");
 $app->define_arg('file','f','','file of SQL command to execute','is_file');
-$app->define_flag('verbose','v',0,'set level between 0 and 3 where 0 is no verbosity, 1 output only errors, 2 will echo all sql query before executing them and 3 will output both sql queries and errors.','is_numeric');
+$app->define_arg('verbose','v',1,'set level between 0 and 3 where 0 is no verbosity, 1 output only errors, 2 will echo all sql query before executing them and 3 will output both sql queries and errors.','is_numeric');
 
 if( function_exists('readline') ){
 	readline_completion_function('autocompletion');
@@ -421,7 +422,7 @@ function callbackOnTable($callBack,$table,$filter=null){
 	$rows = $db->select_to_array($table,'*',$filter);
   if(! $rows )
   	return console_app::msg_info("no result from $table.");
-  console_app::progress_bar(0,"applying $callback on $table",count($rows));
+  console_app::progress_bar(0,"applying $callBack on $table",count($rows));
   $i=0;
   foreach($rows as $row){
   	console_app::refresh_progress_bar(++$i);
@@ -471,7 +472,7 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   }
 
   if( $e === '>' ) # page suivante
-    return printPagedTable($table,$fields,$conds,max($lastPage,$pageId+1));
+    return printPagedTable($table,$fields,$conds,min($lastPage,$pageId+1));
 
   if( $e === '<' ) # page precedante
     return printPagedTable($table,$fields,$conds,max(1,$pageId-1));
