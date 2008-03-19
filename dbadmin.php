@@ -153,15 +153,49 @@ while(TRUE){
           console_app::print_table($res);
 			}
       break;
+    case 'mb_detectconvert':
+    case 'mb_detectorder':
+    case 'mb_detectstrict':
+    case 'mb_setconvert':
+    	if(! $mbStringAvailable){
+    		console_app::msg_error('missing mbstring extension');
+    		break;
+    	}
+    	if($cmd==='mb_detectorder'){
+				$mbStringDetectorder = trim($args);
+				break;
+			}
+			if($cmd==='mb_detectstrict'){
+				$mbStringDetectStrict = preg_match('!^\s*true|on\s*$!i',$args)?true:false;
+				break;
+			}
+			if($cmd==='mb_setconvert'){
+				$mbStringDetectStrict = trim($args);
+				break;
+			}
+			# do conversion
+			if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$args,$m) ){
+				$tables = explode(',',$args);
+			}else{
+				$tables = explode(',',$m[1]);
+				$filter = $m[2];
+			}
+			foreach($tables as $tb)
+				callbackOnTable('detectConvert',$tb);
+    	break;
     case 'maptable':
-    	#- args are fromEncoding/toEncoding tables
     	  @list($func,$tables) = preg_split('!\s+!',$args,2);
     	  if(empty($tables)){
 					console_app::msg_error("Invalid aguments given to reencode");
 					display_help();
 					break;
 				}
-				$tables = explode(',',trim($tables));
+				if(! preg_match('!^(.*?)\s+filter:(.*?)$!',$tables,$m) ){
+					$tables = explode(',',$args);
+				}else{
+					$tables = explode(',',$m[1]);
+					$filter = $m[2];
+				}
 				foreach($tables as $tb)
 					callbackOnTable($func,$tb);
 				break;
@@ -257,31 +291,6 @@ while(TRUE){
         printPagedTable($m[2],$m[1],empty($m[3])?null:$m[3]);
       }
       break;
-    case 'mb_detectconvert':
-    case 'mb_detectorder':
-    case 'mb_detectstrict':
-    case 'mb_setconvert':
-    	if(! $mbStringAvailable){
-    		console_app::msg_error('missing mbstring extension');
-    		break;
-    	}
-    	if($cmd==='mb_detectorder'){
-				$mbStringDetectorder = trim($args);
-				break;
-			}
-			if($cmd==='mb_detectstrict'){
-				$mbStringDetectStrict = preg_match('!^\s*true|on\s*$!i',$args)?true:false;
-				break;
-			}
-			if($cmd==='mb_setconvert'){
-				$mbStringDetectStrict = trim($args);
-				break;
-			}
-			# do conversion
-			$tables = explode(',',$args);
-			foreach($tables as $tb)
-				callbackOnTable('detectConvert',$tb);
-    	break;
     case 'insert':
     case 'do':
     case 'truncate':
