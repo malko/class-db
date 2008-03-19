@@ -548,6 +548,11 @@ function autocompletion(){
   static $completion;
   # console_app::show(func_get_args());
   if(! isset( $completion)){
+  	$completion = array(
+			'show','use','optimise','vacuum','master','verbosity','pagesize',
+			'export','import','maptable','mb_detectconvert','mb_detectorder',
+			'mb_detectstrict','mb_setconvert'
+  	);
     if( $tables = $db->list_tables())
       foreach($tables as $table){
         $completion[] = $table;
