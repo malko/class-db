@@ -2,7 +2,11 @@
 <?php
 /**
 * Sqlite Admin tool
-* @changelog - 2007-12-19 - remove read/write mode argument and some other options
+* @changelog - 2008-03-19 - new possibility to call some callBack on tables to clean datas
+*                         - add some methods to help using mbstring on entire tables
+*                         - add support for use database command (only for mysqldb for now at least)
+*                          (today's modifs are not the better code i can write, only the one i have time for)
+*            - 2007-12-19 - remove read/write mode argument and some other options
 *                         - add support for any db extended class
 *                         - first integration of pagination (quick and dirty)
 *            - 2007-10-03 - remove some warning errors
@@ -14,7 +18,7 @@
 error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
-require('../console_app/class-console_app.php');
+require('../../console_app/trunk/class-console_app.php');
 
 #setting apps params and desc
 $app = new console_app();
@@ -81,6 +85,8 @@ if($dbType==='sqlitedb'){
 # create a db object
 $db = db::getInstance($connectionStr);
 $db->beverbose = $app->get_arg('verbose');
+if(! $db->check_conn('active'))
+	console_app::msg_error("database Connection failed",true);
 
 # setting navigation parameters
 $db->set_slice_attrs(array(
@@ -98,6 +104,12 @@ $db->set_slice_attrs(array(
 $separator = ';';
 $protect   = '';
 
+# mbstring settings
+$mbStringAvailable  = function_exists('mb_convert_encoding')?true:false;
+$mbStringDetectorder= 'UTF-8, ISO-8859-1, ISO-8859-15';
+$mbStringDetectStrict= true;
+$mbStringConvertTo   = 'UTF-8';
+
 $_cmdBuff = '';
 while(TRUE){
   $read = console_app::read('>',null,FALSE);
@@ -111,7 +123,8 @@ while(TRUE){
       break 2;
     case 'tb': $cmd = 'show';$args='tables;';
     case 'show':
-      if(preg_match('!^tables\s*;$!i',strtolower(trim($args)))){
+    	$args = trim($args);
+      if(preg_match('!^tables\s*;?$!i',$args)){
         if(! $res = $db->list_tables()){
           console_app::msg_error("No Tables in database create some first!");
         }else{
@@ -119,7 +132,7 @@ while(TRUE){
             $tables[]=array('table name'=>$table,'nb row'=>$db->get_count($table));
           console_app::print_table($tables);unset($tables);
         }
-      }elseif(preg_match('!^(\w+)\s+fields\s*;$!i',strtolower(trim($args)),$m)){
+      }elseif(preg_match('!^(\w+)\s+fields\s*;?$!i',$args,$m)){
         if(! $res = $db->list_table_fields($m[1])){
           console_app::msg_error($db->last_error['str']);
         }else{
@@ -128,8 +141,26 @@ while(TRUE){
             $fields[]=array('field name'=>$field);
           console_app::print_table($fields);unset($fields);
         }
-      }
+      }elseif($db instanceof mysqldb && preg_match('!^d(bs|atabases)\s*;?$!i',$args) ){
+				if(! $res = $db->query_to_array("show databases"))
+          console_app::msg("No databases!");
+        else
+          console_app::print_table($res);
+			}
       break;
+    case 'maptable':
+    	#- args are fromEncoding/toEncoding tables
+    	  @list($func,$tables) = preg_split('!\s+!',$args,2);
+    	  if(empty($tables)){
+					console_app::msg_error("Invalid aguments given to reencode");
+					display_help();
+					break;
+				}
+				$tables = explode(',',trim($tables));
+				foreach($tables as $tb)
+					callbackOnTable($func,$tb);
+				break;
+    	break;
     case 'import': # import from a csv file
       if(! preg_match('!^\s*(.*)\s+(\S+)(?:\s*;)?$!',trim($args),$m) ){
         console_app::msg_error("What do you mean?");
@@ -153,7 +184,7 @@ while(TRUE){
       }
       $inserted = $inserterr = 0;
       foreach($res as $row){
-        if($protect) 
+        if($protect)
           $row = preg_replace(array("!\\$protect!","!$protect!",),array($protect),$row);
         if($db->insert($table,$row))
           $inserted++;
@@ -185,7 +216,7 @@ while(TRUE){
           $separator = trim($separator);
         }
         $protect  = trim(console_app::read("enter char to use to protect field values (dflt:$protect)",$protect));
-        # add headers 
+        # add headers
         if(console_app::msg_confirm("first row is field names",'')){
           array_unshift($res,array_keys($res[0]));
         }
@@ -221,6 +252,31 @@ while(TRUE){
         printPagedTable($m[2],$m[1],empty($m[3])?null:$m[3]);
       }
       break;
+    case 'mb_detectconvert':
+    case 'mb_detectorder':
+    case 'mb_detectstrict':
+    case 'mb_setconvert':
+    	if(! $mbStringAvailable){
+    		console_app::msg_error('missing mbstring extension');
+    		break;
+    	}
+    	if($cmd==='mb_detectorder'){
+				$mbStringDetectorder = trim($args);
+				break;
+			}
+			if($cmd==='mb_detectstrict'){
+				$mbStringDetectStrict = preg_match('!^\s*true|on\s*$!i',$args)?true:false;
+				break;
+			}
+			if($cmd==='mb_setconvert'){
+				$mbStringDetectStrict = trim($args);
+				break;
+			}
+			# do conversion
+			$tables = explode(',',$args);
+			foreach($tables as $tb)
+				callbackOnTable('detectConvert',$tb);
+    	break;
     case 'insert':
     case 'do':
     case 'truncate':
@@ -232,13 +288,21 @@ while(TRUE){
       $Q_str = check_query($read);
       perform_query($Q_str);
       break;
+    case 'use':
+    	if(! ($db instanceof mysqldb) ){
+    		console_app::msg_info('only supported by mysqldb for now. (i\'m sure you can code and submit it, aren\'t you)?');
+    		break;
+    	}
+      $Q_str = check_query($read);
+      perform_query($Q_str);
+      break;
     case 'help':
     case 'h':
     case '?':
       display_help();
       break;
     case '';
-      if(console_app::msg_confirm("Exit SQLiteAdmin ?"))
+      if(console_app::msg_confirm("Exit dbAdmin ?"))
         break 2;
       break;
     default:
@@ -283,34 +347,84 @@ function perform_query($query){
 
 function display_help(){
   echo "
+###--- Common commands ---###
 ?,h,help will display this help.
 exit,quit,q                       quit application
-tb,show tablename                 will list tables in the databases
 show tablename fields             will list fields in table tablename
+tb,show tablename                 will list tables in the databases
+show databases                    will list databases available on server
+                                  (mysqldb only )
+use databasename                  change the database to work on (same server)
+                                  (mysqldb only )
 optimise tablename                optimize a table
 vacuum tablename                  alias for optimize
-master                            display the content of SQLITE_MASTER 
+master                            display the content of SQLITE_MASTER
                                   (sqlitedb only)
-SQL statements                    perform a query on the database such as 
+SQL statements                    perform a query on the database such as
                                   select, insert update or delete
+
+###--- Import/Export datas from/to csv files ---###
 export tablename filename         export the given table as a csv file
 export SQL statements; filename   export the given query as csv to filename
                                   (don't forget the ';' at the end of query)
 import filename tablename         import the given csv file in table
+
+###--- Datas cleaning methods ---###
+maptable callback tablenames      allow you to array_map a phpfunction
+                                  on all datas in given tables
+                                  (multiple tablename can be separated by ',')
+mb_detectconvert tablenames       try to convert datas charset in given tables
+                                  this REQUIRE mbstring extension to be loaded
+                                  and is totally independant of the database
+                                  settings
+mb_detectorder charsets           set the mb_string detect order see php manual
+                                  for more info
+                                  (default: UTF-8,ISO-8859-1,ISO-8859-15)
+mb_detectstrict true|false        set mb_detect_encoding strict parameter
+                                  (default: true)
+mb_setconvert  charset            set output encoding for mb_convert_encoding
+                                  (default: UTF-8)
 ";
 }
 
-/** 
+function detectConvert($str){
+	global $mbStringAvailable,$mbStringDetectorder,$mbStringDetectStrict,$mbStringConvertTo;
+	return mb_convert_encoding($str,$mbStringConvertTo,mb_detect_encoding($str,$mbStringDetectorder, $mbStringDetectStrict));
+}
+
+/**
+* apply a callback on a table datas using array_map on each row
+* @param mixed  $callBack  any valid callback
+* @param string $table     name of the table where apply the callback
+* @param mixed  $filter    filter to select data as in class-db conds
+*/
+function callbackOnTable($callBack,$table,$filter=null){
+	global $db;
+	$rows = $db->select_to_array($table,'*',$filter);
+  if(! $rows )
+  	return console_app::msg_info("no result from $table.");
+  foreach($rows as $row){
+  	$where = array('WHERE '.implode('=? AND ',array_keys($row)).'=?');
+		$where = array_merge($where,array_values($row));
+		$row = array_map($callBack,$row);
+		$db->update($table,$row,$where);
+		/**
+		$row = array_map($callBack,$row);
+    $db->update($t,$row,array("WHERE $pk=?",$row[$pk]));
+    */
+  }
+}
+/**
 * print table and manage page navigation
 * @param array $sliceRes result as returned by db::select_array_slice()
 */
 function printPagedTable($table,$fields,$conds,$pageId=1){
   global $pageSize,$db;
-  if(! isset($pageSize) )$pageSize = 2;
+  if(! isset($pageSize) )$pageSize = 10;
   $res = $db->select_array_slice($table,$fields,$conds,$pageId,$pageSize);
   if(! $res )
     return console_app::msg("No Result!");
-  
+
   # on affiche le tableau:
   list($results,$nav,$total) = $res;
   console_app::print_table($results);
@@ -318,25 +432,25 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   $e = console_app::read($nav);
   $lastPage = ceil($total/$pageSize);
   if( is_numeric($e) ){ # numero de page on rappel la fonction avec le num de page
-    if($e < 1) 
+    if($e < 1)
       $e = 1;
     elseif( $e > $lastPage)
       $e = $lastPage;
     return printPagedTable($table,$fields,$conds,$e);
   }
-  
+
   if( $e === '>' ) # page suivante
     return printPagedTable($table,$fields,$conds,$pageId+1);
-    
+
   if( $e === '<' ) # page precedante
     return printPagedTable($table,$fields,$conds,$pageId-1);
-  
+
   if( $e === '<<' ) # first page
     return printPagedTable($table,$fields,$conds,1);
-    
+
   if( $e === '>>' ) # last page
     return printPagedTable($table,$fields,$conds,$lastPage);
-  
+
   return;
 }
 
