@@ -2,7 +2,9 @@
 <?php
 /**
 * Sqlite Admin tool
-* @changelog - 2008-03-19 - new possibility to call some callBack on tables to clean datas
+* @changelog - 2008-03-20 - add the rehash command to refresh completion table
+*                         - add maxcolsize and maxcolwidth command
+*            - 2008-03-19 - new possibility to call some callBack on tables to clean datas
 *                         - add some methods to help using mbstring on entire tables
 *                         - add support for use database command (only for mysqldb for now at least)
 *                         - add verbosity command
@@ -21,7 +23,7 @@
 error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
-require('../../console_app/trunk/class-console_app.php');
+require('../console_app/class-console_app.php');
 
 #setting apps params and desc
 $app = new console_app();
@@ -138,7 +140,7 @@ while(TRUE){
           unset($tables);
         }
       }elseif(preg_match('!^(\w+)\s+fields(infos)?\s*;?$!i',$args,$m)){
-      	$extended = $m[2]?true:false;
+      	$extended = empty($m[2])?false:true;
         if(! $res = $db->list_table_fields($m[1],$extended)){
           console_app::msg_error($db->last_error['str']);
           break;
@@ -314,12 +316,21 @@ while(TRUE){
     	}
       $Q_str = check_query($read);
       perform_query($Q_str);
-      break;
+    case 'rehash':
+    case '#':
+    	autocompletion();
+    	break;
     case 'verbosity':
     	$db->beverbose = (int) $args;
     	break;
     case 'pagesize':
     	$pageSize = (int) $args;
+    	break;
+    case 'maxcolwidth':
+    	console_app::$dflt_styles['table']['maxwidth']['dflt'] = (int) $args;
+    	break;
+    case 'maxcolsize':
+			$maxColSize = (int) $args;
     	break;
     case 'help':
     case 'h':
@@ -388,9 +399,14 @@ master                            display the content of SQLITE_MASTER
                                   (sqlitedb only)
 SQL statements                    perform a query on the database such as
                                   select, insert update or delete
+rehash,#                          refresh completion table
+
+###--- Display settings ---###
 verbosity n                       change verbose level while inside the app
 pagesize n                        set the number of results by page
-
+maxcolwidth n                     set the max cols width to n
+maxcolsize n                      set the max chars in cols to n
+                                  (results will be truncated)
 ###--- Paging commands (only when displaying results) ---###
 n                                 go directly to page n
 <, >, <<, >>                      respectively go to
@@ -438,8 +454,7 @@ function callbackOnTable($callBack,$table,$filter=null){
 	$rows = $db->select_to_array($table,'*',$filter);
   if(! $rows )
   	return console_app::msg_info("no result from $table.");
-  console_app::progress_bar(0,"applying $callBack on $table",count($rows));
-  $i=0;
+  console_app::progress_bar($i=0,"applying $callBack on $table",count($rows));
   #- ~ check for primary key
   $fieldInfos = $db->list_table_fields($table,true);
   $PK = false;
@@ -470,7 +485,7 @@ function callbackOnTable($callBack,$table,$filter=null){
 * @param array $sliceRes result as returned by db::select_array_slice()
 */
 function printPagedTable($table,$fields,$conds,$pageId=1){
-  global $pageSize,$db;
+  global $pageSize,$db,$maxColSize;
   if(! isset($pageSize) )$pageSize = 10;
   $res = $db->select_array_slice($table,$fields,$conds,$pageId,$pageSize);
   if(! $res )
@@ -478,6 +493,10 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
 
   # on affiche le tableau:
   list($results,$nav,$total) = $res;
+  if( !empty($maxColSize) ){
+  	foreach($results as $k=>$row)
+			$results[$k] = array_map('truncateMap',$row);
+	}
   console_app::print_table($results);
 
   if($total <= $pageSize) # no navigation on unique page
@@ -513,6 +532,13 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
     return printPagedTable($table,$fields,$conds,$lastPage);
 
   return;
+}
+
+function truncateMap($str){
+	global $maxColSize;
+	if(strlen($str)<=$maxColSize)
+		return $str;
+	return substr($str,0,max(1,$maxColSize-3)).($maxColSize>4?"...":"");
 }
 
 /**
@@ -575,19 +601,21 @@ function save_history($history_file){
 function autocompletion(){
   global $db;
   static $completion;
-  # console_app::show(func_get_args());
-  if(! isset( $completion)){
+  if( ! func_num_args() )
+  	$completion = array() ;
+  #- ~ console_app::show(func_get_args());
+  if( empty($completion) ){
   	$completion = array(
 			'show','use','optimise','vacuum','master','verbosity','pagesize',
 			'export','import','maptable','mb_detectconvert','mb_detectorder',
-			'mb_detectstrict','mb_setconvert'
+			'mb_detectstrict','mb_setconvert','rehash','maxcolwidth','maxcolsize'
   	);
     if( $tables = $db->list_tables())
       foreach($tables as $table){
         $completion[] = $table;
         if($fields = $db->list_table_fields($table,FALSE))
           foreach($fields as $fld)
-        $completion[] = $fld;
+        		$completion[] = $fld;
       }
   }
   return $completion;
