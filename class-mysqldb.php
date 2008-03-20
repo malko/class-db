@@ -6,11 +6,14 @@
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first version
-* @changelog - 2007-11-20 - changing call to vebose() method according to changed made in class-db
+* @changelog - 2008-03-20 - new static parameter (bool) $useNewLink used as mysql_connect new_link parameter
+*                           (really usefull when working on different databases on the same host.
+*                           you'd better set this to false as default if you don't need that feature.)
+*            - 2007-11-20 - changing call to vebose() method according to changed made in class-db
 *            - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more logical to me)
 *            - 2007-01-12 - now dump_to_file() use method escape_string instead of mysql_escape_string
-*            - 2005-02-28 - add method optimize 
-*            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results 
+*            - 2005-02-28 - add method optimize
+*            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results
 *            - 2004-12-02 - use the show fields query in place of a select statement and add extended_info mode to the get_fields method
 * @todo revoir la methode check_conn() et open et close de facon a ce que check_conn aille dans base_db
 * @todo ameliorer fetch_res
@@ -22,6 +25,12 @@ if(! class_exists('db') )
   require(dirname(__file__).'/class-db.php');
 
 class mysqldb extends db{
+	/**
+	* allow the setting of mysql_connect $new_link parameter.
+	* @see mysql_connect for more info
+	*/
+	static public $useNewLink = true;
+
   function mysqldb($dbname,$dbhost='localhost',$dbuser='root',$dbpass=''){ # most common config ?
     $this->host   = $dbhost;
     $this->user   = $dbuser;
@@ -29,17 +38,17 @@ class mysqldb extends db{
     $this->dbname = $dbname;
     $this->open();
   }
-  
+
 	/** open connection to database */
   function open(){  # only for convenience and because backport of sqlitedb
     return $this->check_conn('active');
   }
-	
+
   /** close connection to previously opened database */
   function close(){
     return $this->check_conn('kill');
   }
-  
+
 	/**
   * Select the database to work on (it's the same as the use db command or mysql_select_db function)
   * @param string $dbname
@@ -58,14 +67,14 @@ class mysqldb extends db{
       return $this->db;
     }
   }
-  
+
   /**
   * check and activate db connection
   * @param string $action (active, kill, check) active by default
-  * @return string or bool 
+  * @return string or bool
   */
   function check_conn($action = ''){
-    if(! $host = @mysql_get_host_info($this->conn)){
+    if((! $this->conn) || ! $host = mysql_get_host_info($this->conn)){
       switch ($action){
         case 'kill':
           return $host;
@@ -75,19 +84,19 @@ class mysqldb extends db{
           break;
         default:
         case 'active':
-          if(! $this->conn = @mysql_connect($this->host,$this->user,$this->pass)){
+          if(! $this->conn = mysql_connect($this->host,$this->user,$this->pass,self::$useNewLink)){
             $this->verbose("connection to $this->host failed",__FUNCTION__,1);
             return FALSE;
           }
           $this->verbose("connection to $this->host established",__FUNCTION__,2);
           $this->select_db();
-          return @mysql_get_host_info($this->conn);
+          return mysql_get_host_info($this->conn);
           break;
       }
     }else{
       switch($action){
         case 'kill':
-          @mysql_close($this->conn);
+          mysql_close($this->conn);
           $this->conn = $this->db = null;
           return true;
           break;
@@ -101,8 +110,8 @@ class mysqldb extends db{
       }
     }
   }
-	/** 
-	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
+	/**
+	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH'
 	* @see sqlitedb or mysqldb implementation for exemple
 	* @return array
   */
@@ -111,14 +120,14 @@ class mysqldb extends db{
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
 		eval('$result_type = MYSQL_'.strtoupper($result_type).';');
-    
+
     while($res[]=mysql_fetch_array($result_set,$result_type));
     unset($res[count($res)-1]);//unset last empty row
 
     $this->num_rows = mysql_affected_rows($this->conn);
     return count($res)?$res:FALSE;
   }
-  
+
   /**
   *return the last inserted id if insert is made on a table with autoincrement field
   *@return mixed (certainly int)
@@ -126,7 +135,7 @@ class mysqldb extends db{
 	function last_insert_id(){
     return $this->conn?mysql_insert_id($this->conn):FALSE;
   }
-  
+
 	/**
 	* there's a base method you should replace in the extended class, to use the appropriate escape func regarding the database implementation
 	* @param string $quotestyle (both/single/double) which type of quote to escape
@@ -152,7 +161,7 @@ class mysqldb extends db{
 		}
 		return $string;
   }
-	
+
   /**
   * perform a query on the database
   * @param string $Q_str
@@ -185,7 +194,7 @@ class mysqldb extends db{
       return $num;
 		}
   }
-	
+
   /**
   * get the table list from $this->dbname
   * @return array
@@ -201,7 +210,7 @@ class mysqldb extends db{
   /*
   * return the list of field in $table
   * @param string $table name of the sql table to work on
-  * @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion 
+  * @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion
 	*                           (indexed by fieldname instead of int if false)
 	* @return array
   */
@@ -215,7 +224,7 @@ class mysqldb extends db{
     }
     return $res_;
 	}
-	
+
 	/** Verifier si cette methode peut s'appliquer a SQLite */
   function show_table_keys($table){
     return $this->query_to_array("SHOW KEYS FROM $table");
@@ -231,7 +240,7 @@ class mysqldb extends db{
   function error_no(){
 		return $this->conn?mysql_errno($this->conn):FALSE;
 	}
-	
+
 	/**
 	* @param void $errno only there for compatibility with other db implementation so totally unused there
 	*/
@@ -250,7 +259,7 @@ class mysqldb extends db{
     }
     return $dbs_;
   }
-  
+
   /**
   * dump the database to a file
   * @param string $out_file name of the output file
@@ -288,11 +297,11 @@ class mysqldb extends db{
         else
           fwrite($fout,"\n# `$table` DATAS\n\n");
         unset($stringsfields);$z=0;
-        
+
         foreach($tabledatas as $row){
           unset($values,$fields);
           foreach($row as $field=>$value){
-            if($i==0){ # on the first line we get fields 
+            if($i==0){ # on the first line we get fields
               $fields[] = "`$field`";
               if( mysql_field_type($this->last_qres,$z++) == 'string') # will permit to correctly protect number in string fields
                 $stringsfields[$field]  = TRUE;
@@ -323,7 +332,7 @@ class mysqldb extends db{
     else
       fclose($fout);
   }
-	
+
 	function __destruct(){
 		parent::__destruct();
 	}

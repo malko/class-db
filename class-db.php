@@ -19,8 +19,8 @@
 *                         - no more autoload of console_app when not in sapi cli
 *            - 2007-10-08 - new methods getInstance, setDefaultConnectionStr, and __destruct
 *                           to ease the way of getting uniques db instances for each db
-*            - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow 
-*                           the use of function, wild char or alias in fields list. 
+*            - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow
+*                           the use of function, wild char or alias in fields list.
 *                           will perhaps permit this again with a more effective regex in the future.
 *                           so at this time it's up to you to use this method as needed on any select_* method (still applyed for insert and update)
 *                         - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more ligical to me)
@@ -50,7 +50,7 @@ class db{
 		'select_array_slice'       => 'select_slice',
 		'select_field_to_array'    => 'select_col',
 	);
-	
+
 	/**Db hostname*/
 	public $host = null;
 	/**mysql username*/
@@ -75,24 +75,24 @@ class db{
 	/**the last error array*/
 	public $last_error = array();
 
-	/** 
-  * set the level of verbosity. 
+	/**
+  * set the level of verbosity.
   * It MUST be an integar not a string or nothing will output!!!!
-  * 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors 
+  * 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
 	*/
 	public $beverbose = 0;
-	
+
 	public $autoconnect = TRUE;
-	/** 
+	/**
 	*chr to protect fields names in queries
-	*@private 
+	*@private
 	*/
 	public $_protect_fldname = '`';
-  
+
   /**
   * return a single instance of the database corresponding to the given connection String.
-  * This method must be copyed in the exended class as php is not able to get the name of the calling class (one more poor aspect of this language). 
-  * @param string $connectionStr the connection string is a semi colon separated list 
+  * This method must be copyed in the exended class as php is not able to get the name of the calling class (one more poor aspect of this language).
+  * @param string $connectionStr the connection string is a semi colon separated list
   *                              of connection parameter in the order they appear in the constructor
   *                              preceeded by classname://
   *                              for exemple a mysqldb connection string will look like:
@@ -100,9 +100,9 @@ class db{
   *                              and a sqlitedb one will look like:
   *                              "sqlitedb://dbfile;mode"
   * @param bool $setDefault      if true then this database connection will be the default one
-  *                              returned when no arguments are given. 
-  *                              For conveniance the first call to this method 
-  *                              will set the corresponding instance the default one 
+  *                              returned when no arguments are given.
+  *                              For conveniance the first call to this method
+  *                              will set the corresponding instance the default one
   *                              if none has been set before
   * @return db instance
   */
@@ -125,7 +125,7 @@ class db{
     eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
     return self::$instances[$connectionStr] = $instance;
   }
-  
+
   static public function setDefaultConnectionStr($connectionStr){
     self::$defaultConnStr = $connectionStr;
   }
@@ -140,7 +140,7 @@ class db{
 		if($this->autoconnect)
 			$this->open();
 	}
-  
+
   public function __destruct(){
     foreach( self::$instances as $k=>$db){
       self::$instances[$k]->close();
@@ -166,8 +166,8 @@ class db{
 	* @return bool
 	* /
 	function select_db($dbname=null){}*/
-	/** 
-	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
+	/**
+	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH'
 	* @see sqlitedb or mysqldb implementation for exemple
 	*/
 	public function fetch_res($result_set,$result_type='ASSOC'){}
@@ -232,7 +232,7 @@ class db{
 	/**
 	* return the list of field in $table
 	* @param string $table name of the sql table to work on
-	* @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion 
+	* @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion
 	*                           (indexed by fieldname instead of int if false)
 	* @return array
 	*/
@@ -256,7 +256,7 @@ class db{
 	/**
 	* return the result of a query to an array
 	* @param string $Q_str SQL query
-	* @param string $result_type 'ASSOC', 'NUM' et 'BOTH' 
+	* @param string $result_type 'ASSOC', 'NUM' et 'BOTH'
 	* @return array | false if no result
 	*/
 	public function query_to_array($Q_str,$result_type='ASSOC'){
@@ -272,7 +272,7 @@ class db{
 	* @param string|array $Table
 	* @param string|array $fields
 	* @param string|array $conditions
-	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH' 
+	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH'
 	* @Return  array | false
 	**/
 	public function select_rows($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
@@ -284,7 +284,7 @@ class db{
 			$fld_str = '*';
 		//now the WHERE str
 		$conds_str = $this->process_conds($conds);
-		
+
 		$Q_str = "SELECT $fld_str FROM $tb_str $conds_str";
 		# echo "SQL : $Q_str\n;";
 		return $this->query_to_array($Q_str,$result_type);
@@ -323,10 +323,10 @@ class db{
 			return FALSE;
 	}
 	/**
-	* select a single table field and return all values 
+	* select a single table field and return all values
 	* @param string $table
 	* @param string $field name of the single field to retrieve
-	* @param mixed  $conds 
+	* @param mixed  $conds
 	* @return array or FALSE
 	*/
 	public function select_col($table,$field,$conds=null){
@@ -353,7 +353,7 @@ class db{
 		$attrs = $this->set_slice_attrs();
 		extract($attrs);
 		$nbpages = ceil($tot/max(1,$pageNbRows));
-		
+
 		# start/prev link
 		if($nbpages > 1 && $pageId != 1){
 			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$first);
@@ -368,7 +368,7 @@ class db{
 		}else{
 			$last = $next = '';
 		}
-		
+
 		# pages links
 		if(preg_match('!%(\d+)?links!',$formatStr,$m)){
 			$nblinks = isset($m[1])?$m[1]:'';
@@ -386,10 +386,10 @@ class db{
 																		($i==$pageId?$curpage:$pages)
 																	);
 			}
-			
+
 			$links = implode($linkSep,$pageLinks);
 		}
-		
+
 		$formatStr = str_replace( array('%first','%prev','%next','%last','%'.$nblinks.'links','%tot','%nbpages','%page'),
 															array($first,$prev,$next,$last,$links,$tot,$nbpages,$pageId),
 															$formatStr
@@ -410,10 +410,10 @@ class db{
 	* - linkSep: separator between pages links
 	* - formatStr: is used to render the full pagination string
 	*              %start, %prev, %next, %last will be replaced respectively by corresponding links
-	*              %Nlinks will be replaced by the pages links. N is the number of link to display 
-	*              including the selected page ex: %5links will show 5 pages links 
+	*              %Nlinks will be replaced by the pages links. N is the number of link to display
+	*              including the selected page ex: %5links will show 5 pages links
 	* you can pass only the keys you want to replace ex: db::set_slice_attrs(array('linkStr'=>"myslice.php?page=%page"))
-	* all keys can also contain a %tot and %nbpages which will be replaced respectively by 
+	* all keys can also contain a %tot and %nbpages which will be replaced respectively by
 	* the total amount of result and the total number of pages
 	*@param array $attrs
 	*@return array
@@ -453,7 +453,7 @@ class db{
 			return FALSE;
 		$fld = $this->protect_field_names(array_keys($values));
 		$val = array_map(array($this,'prepare_smart_param'),$values);
-    
+
 		$Q_str = "INSERT INTO $table ($fld) VALUES (".$this->array_to_str($val).")";
 		if(! $this->query($Q_str) )
 			return FALSE;
@@ -551,16 +551,16 @@ class db{
 		if(! count($associatives_res))
 			return FALSE;
 		if($sort_keys)
-			ksort($associatives_res); 
+			ksort($associatives_res);
 		return $this->last_q2a_res = $associatives_res;
 	}
 	/*########## INTERNAL METHOD ##########*/
 
 	/**
 	* used by other methods to parse the conditions param of a QUERY.
-	* If $conds is string then nothing more is done. 
+	* If $conds is string then nothing more is done.
 	* If it's an array, the first value (index 0) will be consider as the full condition string and all '?' will be replaced by other values in the array (sort of sprintf).
-	* You can add a number before a ? to replace it by a given index in the array like 2? 
+	* You can add a number before a ? to replace it by a given index in the array like 2?
 	* @param string|array $conds
 	* @return string
 	*/
@@ -593,7 +593,7 @@ class db{
 		}
 	}
 	/**
-	* used internally to prepare fields for queries 
+	* used internally to prepare fields for queries
 	* @param string|array $fields list of fields. it's up to you to protect fieldsname if you put in fields as string
 	*/
 	public function protect_field_names($fields){
@@ -609,7 +609,7 @@ class db{
 		}
 		return $fields?$fields:false;
 	}
-	
+
 	protected function array_to_str($var,$sep=','){
 		return (is_string($var)?$var:(is_array($var)?implode($sep,$var):''));
 	}
@@ -639,7 +639,7 @@ class db{
 	* @private
 	*/
 	protected function verbose($msg,$callingFunc=null,$msgLvl=1){
-	  if(! $this->beverbose) 
+	  if(! $this->beverbose)
 	    return;
     if( ($msgLvl===2 && $this->beverbose >=2) || ($msgLvl === 1 && $this->beverbose !== 2) ){
       $msg = get_class($this).($callingFunc?"::$callingFunc":'').' => '.$msg;
@@ -661,7 +661,7 @@ class db{
 
 	/**
 	* return the list of field in $table
-	* @deprecated still here for compatibility with old version 
+	* @deprecated still here for compatibility with old version
 	* @use and @see db::list_table_fields() instead
 	* @param string $table name of the sql table to work on
 	* @param bool $extended_info will return the result of a show field query in a query_to_array fashion
