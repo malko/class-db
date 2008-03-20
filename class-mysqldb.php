@@ -74,6 +74,7 @@ class mysqldb extends db{
   * @return string or bool
   */
   function check_conn($action = ''){
+  	$host = false;
     if((! $this->conn) || ! $host = mysql_get_host_info($this->conn)){
       switch ($action){
         case 'kill':
