@@ -6,10 +6,11 @@
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first version
+* @changelog - 2008-04-06 - autoconnect is now a static property
 * @changelog - 2008-03-20 - new static parameter (bool) $useNewLink used as mysql_connect new_link parameter
 *                           (really usefull when working on different databases on the same host.
 *                           you'd better set this to false as default if you don't need that feature.)
-*            - 2007-11-20 - changing call to vebose() method according to changed made in class-db
+* @changelog - 2007-11-20 - changing call to vebose() method according to changed made in class-db
 *            - 2007-03-28 - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more logical to me)
 *            - 2007-01-12 - now dump_to_file() use method escape_string instead of mysql_escape_string
 *            - 2005-02-28 - add method optimize
@@ -29,14 +30,15 @@ class mysqldb extends db{
 	* allow the setting of mysql_connect $new_link parameter.
 	* @see mysql_connect for more info
 	*/
-	static public $useNewLink = true;
+	static public $useNewLink = false;
 
-  function mysqldb($dbname,$dbhost='localhost',$dbuser='root',$dbpass=''){ # most common config ?
+  function __construct($dbname,$dbhost='localhost',$dbuser='root',$dbpass=''){ # most common config ?
     $this->host   = $dbhost;
     $this->user   = $dbuser;
     $this->pass   = $dbpass;
     $this->dbname = $dbname;
-    $this->open();
+    if(db::$autoconnect)
+    	$this->open();
   }
 
 	/** open connection to database */
@@ -170,7 +172,7 @@ class mysqldb extends db{
   **/
   function query($Q_str){
     if(! $this->db ){
-      if(! ($this->autoconnect && $this->check_conn('check')))
+      if(! (db::$autoconnect && $this->check_conn('check')))
         return FALSE;
     }
 		$this->verbose($Q_str,__FUNCTION__,2);
@@ -338,4 +340,3 @@ class mysqldb extends db{
 		parent::__destruct();
 	}
 }
-?>
