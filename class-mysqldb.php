@@ -17,13 +17,7 @@
 *            - 2004-12-03 - now the associative_array_from_q2a_res method won't automaticly ksort the results
 *            - 2004-12-02 - use the show fields query in place of a select statement and add extended_info mode to the get_fields method
 * @todo revoir la methode check_conn() et open et close de facon a ce que check_conn aille dans base_db
-* @todo ameliorer fetch_res
-* @todo ajouter list_dbs as base db
-* @todo ameliorer query_to_array constants (Num/ASSOC/BOTH) (supporter les constantes en + des chaines)
 */
-
-if(! class_exists('db') )
-  require(dirname(__file__).'/class-db.php');
 
 class mysqldb extends db{
 	/**
