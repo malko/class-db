@@ -8,7 +8,9 @@
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2008-02-19 - now get_count() method can receive optional clause as second parameter
+* @changelog - 2008-04-06 - autoconnect is now a static property
+*                         - now db::getInstance call require on missing class-xxxxdb.php
+*            - 2008-02-19 - now get_count() method can receive optional clause as second parameter
 *                         - add method _call() and static property db::$aliases to support methods aliases to be user defined (you can set your own aliases for any methods)
 *                         - rename most of select_* methods with 'better' name (shorter and better meaning I hope) But old names will work just fine with new methods aliases support
 *            - 2007-11-20 - now beverbose property is int instead of bool and can takes 4 values
@@ -49,6 +51,13 @@ class db{
 		'select_single_value'      => 'select_value',
 		'select_array_slice'       => 'select_slice',
 		'select_field_to_array'    => 'select_col',
+		/** camelCase style aliases (for my own pleasure) */
+		'selectRows'               => 'select_rows',
+		'selectRow'                => 'select_row',
+		'selectAssociative'        => 'select_associative',
+		'selectCol'                => 'select_col',
+		'selectSlice'              => 'select_slice',
+		'selectValue'              => 'select_value',
 	);
 
 	/**Db hostname*/
@@ -82,7 +91,7 @@ class db{
 	*/
 	public $beverbose = 0;
 
-	public $autoconnect = TRUE;
+	static public $autoconnect = TRUE;
 	/**
 	*chr to protect fields names in queries
 	*@private
@@ -122,6 +131,8 @@ class db{
     for($i=0;$i<$paramNb;++$i){
       $pEval[] = "\$params[$i]";
     }
+    if(! class_exists($class) )
+			require (dirname(__file__)."/class-$class.php");
     eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
     return self::$instances[$connectionStr] = $instance;
   }
@@ -137,7 +148,7 @@ class db{
   * 2- permit getInstance to create any derived class without redefining it in each subclass
   */
 	public function __construct(){
-		if($this->autoconnect)
+		if(self::$autoconnect)
 			$this->open();
 	}
 
@@ -683,5 +694,3 @@ class db{
 	}
 
 }
-
-?>
