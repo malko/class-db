@@ -24,6 +24,7 @@ error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
 require('../console_app/class-console_app.php');
+require('class-db.php');
 
 #setting apps params and desc
 $app = new console_app();
@@ -68,9 +69,6 @@ if( empty($dbType) ){
   }
 }
 
-if(! file_exists('class-'.$dbType.'.php'))
-  console_app::msg_error("Can't find required file",true); // exit script
-require('class-'.$dbType.'.php');
 # now that include are done return to original path
 chdir($working_dir);
 
