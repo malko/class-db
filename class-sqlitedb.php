@@ -1,5 +1,5 @@
 <?php
-# load base class 
+# load base class
 if(! class_exists('db'))
     require(dirname(__file__).'/class-db.php');
 
@@ -9,48 +9,38 @@ if(! class_exists('db'))
 * @package DB
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage SQLITE
-* @changelog 2006-05-12 - clean the escape_string() method
-*            2006-04-17 - rewrite the class to use abstarction class db
-*                       - Conditions params support on methods select_*, update, delete totally rewrite to handle smat question mark
-*                         @see db::process_conds()
-*                       - get_field and list_fields are now deprecated but still supported (listfield will be indexed by name whatever is $indexed_by_name)
-*            2005-02-25 - now the associative_array_from_q2a_res method won't automaticly ksort the results anymore
-*                       - re-enable the possibility to choose between SQLITE_ASSOC or SQLITE_NUM
-*            2005-02-28 - new method optimize and vacuum
-*            2005-04-05 - get_fields will now try to get fields from sqlite_master if no data found in the table
-* @todo add transactions support
-* @todo add check_conn method
+* @changelog - 2008-04-06 - no more $mode parameter to construct the database (not managed by the extension at all so drop it)
+*                         - drop php4 support, and buffered query are no longer supported (was useless as db has it's own buffer)
+*                         - autoconnect is now a static property
+*                         - add check_conn method
+*            - 2006-05-12 - clean the escape_string() method
+*            - 2006-04-17 - rewrite the class to use abstarction class db
+*                         - Conditions params support on methods select_*, update, delete totally rewrite to handle smat question mark
+*                           @see db::process_conds()
+*                         - get_field and list_fields are now deprecated but still supported (listfield will be indexed by name whatever is $indexed_by_name)
+*            - 2005-02-25 - now the associative_array_from_q2a_res method won't automaticly ksort the results anymore
+*                         - re-enable the possibility to choose between SQLITE_ASSOC or SQLITE_NUM
+*            - 2005-02-28 - new method optimize and vacuum
+*            - 2005-04-05 - get_fields will now try to get fields from sqlite_master if no data found in the table
+* @todo add transactions support (you can use it on your own with query())
 */
+
 class sqlitedb extends db{
-  var $buffer_on = TRUE;
-  var $autocreate= FALSE;
-  var $db_file = '';
-  var $_protect_fldname = "'";
+  public $autocreate= TRUE;
+
+  public $db_file = '';
+  public $_protect_fldname = "'";
   /**
   * create a sqlitedb object for managing locale data
   * if DATA_PATH is define will force access in this directory
   * @param string $Db_file
   * @return sqlitedb object
   */
-  function sqlitedb($db_file,$mode=null){
-    # readwrite mode to open database
-    switch ($mode){
-      case 'r':
-        $mod = 0444;
-        break;
-      case 'w':
-        $mod = 0666;
-        break;
-      default:
-				$mod = is_numeric($mode)?$mode:0666;
-    }
-    $this->mode = $mod;
-		if($this->mode >= 0600)
-			$this->autocreate = true;
+  function sqlitedb($db_file){
     $this->host = 'localhost';
     $this->db_file = $db_file;
     $this->conn = &$this->db; # only for better compatibility with other db implementation
-		if($this->autoconnect)
+		if(db::$autoconnect)
 			$this->open();
   }
 ###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
@@ -63,10 +53,10 @@ class sqlitedb extends db{
       return FALSE;
     if(! (is_file($this->db_file) || $this->autocreate) )
       return FALSE;
-    if( $this->db = sqlite_open($this->db_file, $this->mode, $error)){
+    if( $this->db = sqlite_open($this->db_file, 0666, $error)){
       return $this->db;
     }else{
-      echo "$error\n";
+      $this->verbose($error,__FUNCTION__,1);
       return FALSE;
     }
   }
@@ -76,6 +66,25 @@ class sqlitedb extends db{
     if( !is_null($this->db) )
       sqlite_close($this->db);
     $this->db = null;
+  }
+
+	/**
+  * check and activate db connection
+  * @param string $action (active, kill, check) active by default
+  * @return bool
+  */
+  function check_conn($action = ''){
+  	if(! $this->db)){
+  		if($action !== 'active')
+  			return $action==='kill'?true:false;
+      return $this->open()===false?false:true;
+    }else{
+    	if($action==='kill'){
+				$this->close();
+				$this->db = null;
+			}
+    	return true;
+    }
   }
 
   /**
@@ -88,15 +97,13 @@ class sqlitedb extends db{
     if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
       $result_type = 'ASSOC';
     eval('$result_type = SQLITE_'.$result_type.';');
-    
+
     while($res[]=sqlite_fetch_array($result_set,$result_type));
     unset($res[count($res)-1]);//unset last empty row
-    
-    if($this->buffer_on)
-      $this->num_rows = sqlite_num_rows($this->last_qres);
-    else
-      $this->num_rows = count($res)-1;
-    
+
+    #- ~ $this->num_rows = sqlite_num_rows($this->last_qres);
+    $this->num_rows = count($res);
+
     return $this->last_q2a_res = count($res)?$res:FALSE;
   }
 
@@ -111,20 +118,16 @@ class sqlitedb extends db{
   */
   function query($Q_str){
     if(! $this->db ){
-      if(! ($this->autoconnect && $this->open()) )
+      if(! (db::$autoconnect && $this->open()) )
         return FALSE;
     }
-		if($this->beverbose)
-			echo "$Q_str\n";
-    if($this->buffer_on)
-      $this->last_qres = sqlite_query($this->db,$Q_str);
-    else
-      $this->last_qres = sqlite_unbuffered_query($this->db,$Q_str);
+	  $this->verbose($Q_str,__FUNCTION__,2);
+    $this->last_qres = sqlite_unbuffered_query($this->db,$Q_str);
     if(! $this->last_qres)
       $this->set_error(__FUNCTION__);
     return $this->last_qres;
   }
-  
+
   /**
   * perform a query on the database like query but return the affected_rows instead of result
   * give a most suitable answer on query such as INSERT OR DELETE
@@ -150,7 +153,7 @@ class sqlitedb extends db{
     # Try the simple method
     if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
       return array_keys($res[0]);
-    }else{ # There 's no row in this table so we try an alternate method or we want extended infos            
+    }else{ # There 's no row in this table so we try an alternate method or we want extended infos
       if(! $fields = $this->query_to_array("SELECT sql FROM sqlite_master WHERE type='table' AND name ='$table'") )
         return FALSE;
       # get fields from the create query
@@ -197,7 +200,7 @@ class sqlitedb extends db{
 
   /** Verifier si cette methode peut s'appliquer a SQLite * /
   function show_table_keys($table){}
-  
+
   /**
   * optimize table statement query
   * @param string $table name of the table to optimize
@@ -219,7 +222,7 @@ class sqlitedb extends db{
   function error_no(){
     return $this->db?sqlite_last_error($this->db):FALSE;
   }
-	
+
 	function error_str($errno=null){
     return sqlite_error_string($errno);
   }
