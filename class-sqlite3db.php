@@ -9,7 +9,7 @@
 * @todo add transactions support
 */
 
-class sqlite3db{
+class sqlite3db extends db{
   public $autocreate= TRUE;
 
   public $db_file = '';
@@ -20,7 +20,7 @@ class sqlite3db{
   * @param string $Db_file
   * @return sqlitedb object
   */
-  function sqlitedb($db_file){
+  function __construct($db_file){
     $this->host = 'localhost';
     $this->db_file = $db_file;
     $this->conn = &$this->db; # only for better compatibility with other db implementation
@@ -41,7 +41,7 @@ class sqlite3db{
     if( $this->db = sqlite3_open($this->db_file)){
       return $this->db;
     }else{
-      $this->verbose(,__FUNCTION__,1);
+      $this->set_error(__FUNCTION__);
       return FALSE;
     }
   }
@@ -61,7 +61,7 @@ class sqlite3db{
   * @return bool
   */
   function check_conn($action = ''){
-  	if(! $this->db)){
+  	if(! $this->db){
   		if($action !== 'active')
   			return $action==='kill'?true:false;
       return $this->open()===false?false:true;
@@ -107,7 +107,7 @@ class sqlite3db{
   /**
   * perform a query on the database
   * @param string $Q_str
-  * @return result id | FALSE
+  * @return result id or bool depend on the query type| FALSE
   */
   function query($Q_str){
     if(! $this->db ){
@@ -117,10 +117,16 @@ class sqlite3db{
 	  $this->verbose($Q_str,__FUNCTION__,2);
 	  if($this->last_qres)#- close unclosed previous qres
 	  	sqlite3_query_close($this->last_qres);
-    $this->last_qres = sqlite3_query($this->db,$Q_str);
-    if(! $this->last_qres)
+	  if( preg_match('!^\s*select!i',$Q_str) ){
+    	$this->last_qres = sqlite3_query($this->db,$Q_str);
+    	$res = $this->last_qres;
+    }else{
+			$res = sqlite3_exec($this->db,$Q_str);
+		}
+    if(! $res)
       $this->set_error(__FUNCTION__);
-    return $this->last_qres;
+
+    return $res;
   }
 
   /**
@@ -256,7 +262,7 @@ class sqlite3db{
 
   function error_no(){
   	$this->verbose('sqlite3 driver doesn\'t support this method',__function__,1);
-  };
+  }
 
 	function error_str($errno=null){
     return sqlite3_error($this->db);
