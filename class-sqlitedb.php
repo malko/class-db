@@ -70,7 +70,7 @@ class sqlitedb extends db{
   * @return bool
   */
   function check_conn($action = ''){
-  	if(! $this->db)){
+  	if(! $this->db){
   		if($action !== 'active')
   			return $action==='kill'?true:false;
       return $this->open()===false?false:true;
@@ -88,7 +88,7 @@ class sqlitedb extends db{
   * @param resource $result_set
   * @param string $result_type in 'ASSOC','NUM','BOTH'
   */
-  function fetch_res(&$result_set,$result_type='ASSOC'){
+  function fetch_res($result_set,$result_type='ASSOC'){
     $result_type = strtoupper($result_type);
     if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
       $result_type = 'ASSOC';
