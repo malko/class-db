@@ -1,61 +1,34 @@
 <?php
-# load base class 
-if(! class_exists('db'))
-    require(dirname(__file__).'/class-db.php');
-
 /**
-* @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2003-2004  Jonathan Gotti
+* @author Jonathan Gotti <jgotti at jgotti dot org>
+* @copyleft (l) 2008  Jonathan Gotti
 * @package DB
+* @since 2008-04
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
-* @subpackage SQLITE
-* @changelog 2006-05-12 - clean the escape_string() method
-*            2006-04-17 - rewrite the class to use abstarction class db
-*                       - Conditions params support on methods select_*, update, delete totally rewrite to handle smat question mark
-*                         @see db::process_conds()
-*                       - get_field and list_fields are now deprecated but still supported (listfield will be indexed by name whatever is $indexed_by_name)
-*            2005-02-25 - now the associative_array_from_q2a_res method won't automaticly ksort the results anymore
-*                       - re-enable the possibility to choose between SQLITE_ASSOC or SQLITE_NUM
-*            2005-02-28 - new method optimize and vacuum
-*            2005-04-05 - get_fields will now try to get fields from sqlite_master if no data found in the table
+* @subpackage SQLITE3
 * @todo add transactions support
-* @todo add check_conn method
 */
-class sqlitedb extends db{
-  public $buffer_on = TRUE;
-  public $autocreate= FALSE;
+
+class sqlite3db{
+  public $autocreate= TRUE;
+
   public $db_file = '';
   public $_protect_fldname = "'";
-  /** use the sqlite3 version of sqlite extension */
-  public $useSqlite3 = true;
   /**
   * create a sqlitedb object for managing locale data
   * if DATA_PATH is define will force access in this directory
   * @param string $Db_file
   * @return sqlitedb object
   */
-  function sqlitedb($db_file,$mode=null){
-    # readwrite mode to open database
-    switch ($mode){
-      case 'r':
-        $mod = 0444;
-        break;
-      case 'w':
-        $mod = 0666;
-        break;
-      default:
-				$mod = is_numeric($mode)?$mode:0666;
-    }
-    $this->mode = $mod;
-		if($this->mode >= 0600)
-			$this->autocreate = true;
+  function sqlitedb($db_file){
     $this->host = 'localhost';
     $this->db_file = $db_file;
     $this->conn = &$this->db; # only for better compatibility with other db implementation
-		if($this->autoconnect)
+		if(db::$autoconnect)
 			$this->open();
   }
-###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
+
+	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
   /** open connection to database */
   function open(){
     //prevent multiple db open
@@ -65,27 +38,40 @@ class sqlitedb extends db{
       return FALSE;
     if(! (is_file($this->db_file) || $this->autocreate) )
       return FALSE;
-    $this->db = $this->useSqlite3?sqlite3_open($this->db_file):sqlite_open($this->db_file, $this->mode);
-    if( $this->db){
+    if( $this->db = sqlite3_open($this->db_file)){
       return $this->db;
     }else{
-      $this->verbose('Can\'t open database connection',__function__);
+      $this->verbose(,__FUNCTION__,1);
       return FALSE;
     }
   }
-
   /** close connection to previously opened database */
   function close(){
     if( !is_null($this->db) ){
-      if($this->useSqlite3){
-        if($this->last_qres)
-          sqlite3_query_close($this->last_qres);
-        sqlite3_close($this->db);
-      }else{
-        sqlite_close($this->db);
-      }
+    	if($this->last_qres)
+        sqlite3_query_close($this->last_qres);
+      sqlite3_close($this->db);
     }
     $this->db = null;
+  }
+
+  /**
+  * check and activate db connection
+  * @param string $action (active, kill, check) active by default
+  * @return bool
+  */
+  function check_conn($action = ''){
+  	if(! $this->db)){
+  		if($action !== 'active')
+  			return $action==='kill'?true:false;
+      return $this->open()===false?false:true;
+    }else{
+    	if($action==='kill'){
+				$this->close();
+				$this->db = null;
+			}
+    	return true;
+    }
   }
 
   /**
@@ -97,31 +83,25 @@ class sqlitedb extends db{
     $result_type = strtoupper($result_type);
     if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
       $result_type = 'ASSOC';
-    eval('$result_type = SQLITE_'.$result_type.';');
-    if($this->useSqlite3){
-      if($result_type===SQLITE_ASSOC){
-        while($res[]=sqlite3_fetch_array($result_set));
-        unset($res[count($res)-1]);//unset last empty row
-      }elseif($result_type===SQLITE_NUM){
-        while($res[]=sqlite3_fetch($result_set));
-        unset($res[count($res)-1]);//unset last empty row
-      }else{
-        while($row=sqlite3_fetch_array($result_set)){
-          $res[] = array_merge($row,array_values($row));
-        };
-      }
-    }else{
-      while($res[]=sqlite_fetch_array($result_set,$result_type));
-      unset($res[count($res)-1]);//unset last empty row
-    }
-    if( empty($res) )
+		if($result_type==='ASSOC'){
+			while($res[]=sqlite3_fetch_array($result_set));
+			unset($res[count($res)-1]);//unset last empty row
+		}elseif($result_type==='NUM'){
+			while($res[]=sqlite3_fetch($result_set));
+			unset($res[count($res)-1]);//unset last empty row
+		}else{
+			while($row=sqlite3_fetch_array($result_set)){
+				$res[] = array_merge($row,array_values($row));
+			};
+		}
+		if( empty($res) )
       return $this->last_q2a_res = false;
     $this->num_rows = count($res);
     return $this->last_q2a_res = $res;
   }
 
   function last_insert_id(){
-    return $this->db?($this->useSqlite3?sqlite3_last_insert_rowid($this->db):sqlite_last_insert_rowid($this->db)):FALSE;
+    return $this->db?sqlite3_last_insert_rowid($this->db):FALSE;
   }
 
   /**
@@ -131,23 +111,18 @@ class sqlitedb extends db{
   */
   function query($Q_str){
     if(! $this->db ){
-      if(! ($this->autoconnect && $this->open()) )
+      if(! (db::$autoconnect && $this->open()) )
         return FALSE;
     }
-		if($this->beverbose)
-			echo "$Q_str\n";
-    if($this->buffer_on || $this->useSqlite3){
-      $this->last_qres = $this->useSqlite3?sqlite3_query($this->db,$Q_str):sqlite_query($this->db,$Q_str);
-      #- if($this->useSqlite3 && $this->last_qres)
-        #- sqlite3_query_exec($this->last_qres);
-    }else{
-      $this->last_qres = sqlite_unbuffered_query($this->db,$Q_str);
-    }
+	  $this->verbose($Q_str,__FUNCTION__,2);
+	  if($this->last_qres)#- close unclosed previous qres
+	  	sqlite3_query_close($this->last_qres);
+    $this->last_qres = sqlite3_query($this->db,$Q_str);
     if(! $this->last_qres)
       $this->set_error(__FUNCTION__);
     return $this->last_qres;
   }
-  
+
   /**
   * perform a query on the database like query but return the affected_rows instead of result
   * give a most suitable answer on query such as INSERT OR DELETE
@@ -159,7 +134,7 @@ class sqlitedb extends db{
   function query_affected_rows($Q_str){
     if(! $this->query($Q_str) )
       return FALSE;
-    return $this->useSqlite3?sqlite3_changes($this->db):sqlite_changes($this->db);
+    return sqlite3_changes($this->db);
   }
 
   /**
@@ -171,9 +146,9 @@ class sqlitedb extends db{
   */
   function list_table_fields($table,$extended_info=FALSE){
     # Try the simple method
-    if( false&& (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
+    if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
       return array_keys($res[0]);
-    }else{ # There 's no row in this table so we try an alternate method or we want extended infos            
+    }else{ # There 's no row in this table so we try an alternate method or we want extended infos
       if(! $fields = $this->query_to_array("SELECT sql FROM sqlite_master WHERE type='table' AND name ='$table'") )
         return FALSE;
       # get fields from the create query
@@ -181,7 +156,7 @@ class sqlitedb extends db{
       $flds_str = substr($flds_str,strpos($flds_str,'('));
       $type = "((?:[a-z]+)\s*(?:\(\s*\d+\s*(?:,\s*\d+\s*)?\))?)?\s*";
       $default = '(?:DEFAULT\s+((["\']).*?(?<!\\\\)\\4|[^\s,]+))?\s*';
-      if( preg_match_all('/\[?(\w+)\]?\s+'.$type.$default.'[^,]*(,|\))/i',$flds_str,$m,PREG_SET_ORDER) ){
+      if( preg_match_all('/(\w+)\s+'.$type.$default.'[^,]*(,|\))/i',$flds_str,$m,PREG_SET_ORDER) ){
         $key  = "PRIMARY|UNIQUE|CHECK";
         $Extra = 'AUTOINCREMENT';
         $default = 'DEFAULT\s+((["\'])(.*?)(?<!\\\\)\\2|\S+)';
@@ -220,7 +195,7 @@ class sqlitedb extends db{
 
   /** Verifier si cette methode peut s'appliquer a SQLite * /
   function show_table_keys($table){}
-  
+
   /**
   * optimize table statement query
   * @param string $table name of the table to optimize
@@ -239,41 +214,63 @@ class sqlitedb extends db{
     return $this->query("VACUUM $table_or_index;");
   }
 
-  function error_no(){
-    return $this->db?($this->useSqlite3?sqlite3_error($this->db):sqlite_last_error($this->db)):FALSE;
-  }
-	
-	function error_str($errno=null){
-    return sqlite_error_string($errno);
-  }
-
   /**
   * base method you should replace this one in the extended class, to use the appropriate escape func regarding the database implementation
   * @param string $quotestyle (both/single/double) which type of quote to escape
   * @return str
   */
   function escape_string($string,$quotestyle='both'){
-    $string = sqlite_escape_string($string);
-    switch(strtolower($quotestyle)){
-      case 'double':
-      case 'd':
-      case '"':
-        $string = str_replace("''","'",$string);
-        $string = str_replace('"','\"',$string);
-        break;
-      case 'single':
-      case 's':
-      case "'":
-        break;
-      case 'both':
-      case 'b':
-      case '"\'':
-      case '\'"':
-        $string = str_replace('"','\"',$string);
-        break;
-    }
-    return $string;
-  }
-}
 
-?>
+		if( function_exists('sqlite_escape_string') ){
+			$string = sqlite_escape_string($string);
+			$string = str_replace("''","'",$string); #- no quote escaped so will work like with no sqlite_escape_string available
+		}else{
+			$escapes = array("\x00", "\x0a", "\x0d", "\x1a", "\x09","\\");
+			$replace = array('\0',   '\n',    '\r',   '\Z' , '\t',  "\\\\");
+		}
+		switch(strtolower($quotestyle)){
+			case 'double':
+			case 'd':
+			case '"':
+				$escapes[] = '"';
+				$replace[] = '\"';
+				break;
+			case 'single':
+			case 's':
+			case "'":
+				$escapes[] = "'";
+				$replace[] = "''";
+				break;
+			case 'both':
+			case 'b':
+			case '"\'':
+			case '\'"':
+				$escapes[] = '"';
+				$replace[] = '\"';
+				$escapes[] = "'";
+				$replace[] = "''";
+				break;
+		}
+		return str_replace($escapes,$replace,$string);
+	}
+
+  function error_no(){
+  	$this->verbose('sqlite3 driver doesn\'t support this method',__function__,1);
+  };
+
+	function error_str($errno=null){
+    return sqlite3_error($this->db);
+  }
+
+  protected function set_error($callingfunc=null){
+		static $i=0;
+		if(! $this->db ){
+			$this->error[$i] = '[ERROR] No Db Handler';
+		}else{
+			$this->error[$i] =  $this->error_str();
+		}
+		$this->last_error = $this->error[$i];
+    $this->verbose($this->error[$i],$callingfunc,1);
+		$i++;
+	}
+}
