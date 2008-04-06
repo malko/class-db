@@ -166,7 +166,7 @@ class mysqldb extends db{
   **/
   function query($Q_str){
     if(! $this->db ){
-      if(! (db::$autoconnect && $this->check_conn('check')))
+      if(! (db::$autoconnect && $this->check_conn('active')))
         return FALSE;
     }
 		$this->verbose($Q_str,__FUNCTION__,2);
