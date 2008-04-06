@@ -1,11 +1,11 @@
 <?php
 /**
-* @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2004-2007  Jonathan Gotti
+* @author Jonathan Gotti <jgotti at jgotti dot org>
+* @copyleft (l) 2003-2008  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage MYSQL
-* @since 2004-11-26 first version
+* @since 2004-11-26 first splitted version
 * @changelog - 2008-04-06 - autoconnect is now a static property
 * @changelog - 2008-03-20 - new static parameter (bool) $useNewLink used as mysql_connect new_link parameter
 *                           (really usefull when working on different databases on the same host.

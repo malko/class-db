@@ -1,11 +1,11 @@
 <?php
 /**
 * Base class for databases object.
-* @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2004-2007  Jonathan Gotti
+* @author Jonathan Gotti <jgotti at jgotti dot org>
+* @copyleft (l) 2003-2008  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
-* @since 2006-04-16 first version
+* @since 2006-04-16 first splitted version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
 * @changelog - 2008-04-06 - autoconnect is now a static property

@@ -1,11 +1,7 @@
 <?php
-# load base class
-if(! class_exists('db'))
-    require(dirname(__file__).'/class-db.php');
-
 /**
-* @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
-* @copyleft (l) 2003-2004  Jonathan Gotti
+* @author Jonathan Gotti <jgotti at jgotti dot org>
+* @copyleft (l) 2003-2008  Jonathan Gotti
 * @package DB
 * @license http://opensource.org/licenses/gpl-license.php GNU Public License
 * @subpackage SQLITE
