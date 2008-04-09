@@ -32,7 +32,7 @@ class sqlitedb extends db{
   * @param string $Db_file
   * @return sqlitedb object
   */
-  function sqlitedb($db_file){
+  function __construct($db_file){
     $this->host = 'localhost';
     $this->db_file = $db_file;
     $this->conn = &$this->db; # only for better compatibility with other db implementation
