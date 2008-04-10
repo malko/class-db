@@ -1090,6 +1090,10 @@ abstract class abstractModel{
   	if( $needSave < 0 )
   		return $this;
   	if( method_exists($this,'onBeforeSave') ){
+  		$PK = $this->PK;
+			$res = $this->onBeforeSave();
+			if( $PK !== $this->PK)
+				self::_setInstanceKey($this,$PK);
   		if( true === $this->onBeforeSave() )
   			return $this;
   	}
