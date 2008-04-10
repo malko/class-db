@@ -8,7 +8,8 @@
 * @since 2006-04-16 first splitted version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2008-04-06 - autoconnect is now a static property
+* @changelog - 2008-04-10 - new class dbprofiler
+*            - 2008-04-06 - autoconnect is now a static property
 *                         - now db::getInstance call require on missing class-xxxxdb.php
 *            - 2008-02-19 - now get_count() method can receive optional clause as second parameter
 *                         - add method _call() and static property db::$aliases to support methods aliases to be user defined (you can set your own aliases for any methods)
@@ -33,6 +34,59 @@
 *            - 2006-12-05 - new method select_field_to_array()
 *            - 2006-05-15 - new methods set_slice_attrs() and select_array_slice() to easily paginate your results
 */
+
+class dbProfiler{
+	static public $precision     = 4;
+
+	static public $stats    = array();
+	protected $db           = null;
+	protected $statFuncs    = null;
+
+	function __construct($dbInstance){
+		$this->db  = $dbInstance;
+		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','query','query_to_array'));
+	}
+
+	function __call($m,$a){
+		if(! in_array($m,$this->statFuncs))
+			return call_user_func_array(array($this->db,$m),$a);
+		# - get stat on queries
+		$stat = array("<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',$this->get_microtime());
+		$res  = call_user_func_array(array($this->db,$m),$a);
+		$stat[] = $this->get_microtime();
+		self::$stats[] = $stat;
+		return $res;
+	}
+
+	function _prepareArgStr($a){
+		return var_export($a,1);
+	}
+
+	static function printReport(){
+		if(! count(self::$stats) )
+			return;
+		$total = 0;
+		foreach(self::$stats as $stat){
+			list($query,$start,$end) = $stat;
+			$time = round($end-$start,self::$precision);
+			$rows[] = '<tr><td style="border-bottom:solid silver 1px;">'.$query.'</td><td style="border-bottom:solid silver 1px;text-align:right;">'.$time.' sec</td></tr>';
+			$total += $time;
+		}
+		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;">
+		<caption style="text-align:left;font-weight:bold;" onclick="var body = document.getElementById(\'dbProfilerReport\');body.style.display=(body.style.display==\'none\'?\'table-row-group\':\'none\')">dbProfiler report</caption>
+		<thead><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
+		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
+		<tbody id="dbProfilerReport" style="display:none;">'.implode('',$rows)."</tbody>
+		</table>";
+	}
+
+	function get_microtime(){
+		list($usec, $sec) = explode(" ",microtime());
+		return ((float)$usec + (float)$sec);
+	}
+
+}
+
 
 class db{
 	/** array of instances already created, one for each connection strings */
