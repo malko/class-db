@@ -47,6 +47,14 @@ class dbProfiler{
 		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','query','query_to_array'));
 	}
 
+	function __get($k){
+		return $this->db->$k;
+	}
+
+	function __set($k,$v){
+		return $this->db->$k = $v;
+	}
+
 	function __call($m,$a){
 		if(! in_array($m,$this->statFuncs))
 			return call_user_func_array(array($this->db,$m),$a);
