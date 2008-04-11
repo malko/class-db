@@ -1094,7 +1094,7 @@ abstract class abstractModel{
 			$res = $this->onBeforeSave();
 			if( $PK !== $this->PK)
 				self::_setInstanceKey($this,$PK);
-  		if( true === $this->onBeforeSave() )
+  		if( true === $res )
   			return $this;
   	}
   	$this->needSave = -1;
