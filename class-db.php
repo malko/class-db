@@ -147,9 +147,9 @@ class db{
 	public $last_error = array();
 
 	/**
-  * set the level of verbosity.
-  * It MUST be an integar not a string or nothing will output!!!!
-  * 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
+	* set the level of verbosity.
+	* It MUST be an integar not a string or nothing will output!!!!
+	* 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
 	*/
 	public $beverbose = 0;
 
@@ -160,72 +160,72 @@ class db{
 	*/
 	public $_protect_fldname = '`';
 
-  /**
-  * return a single instance of the database corresponding to the given connection String.
-  * This method must be copyed in the exended class as php is not able to get the name of the calling class (one more poor aspect of this language).
-  * @param string $connectionStr the connection string is a semi colon separated list
-  *                              of connection parameter in the order they appear in the constructor
-  *                              preceeded by classname://
-  *                              for exemple a mysqldb connection string will look like:
-  *                              "mysqldb://dbname;dbhost:port;dbuser;dbpass"
-  *                              and a sqlitedb one will look like:
-  *                              "sqlitedb://dbfile;mode"
-  * @param bool $setDefault      if true then this database connection will be the default one
-  *                              returned when no arguments are given.
-  *                              For conveniance the first call to this method
-  *                              will set the corresponding instance the default one
-  *                              if none has been set before
-  * @return db instance
-  */
-  static public function getInstance($connectionStr=null,$setDefault=false){
-    if( is_null(self::$defaultConnStr) ){
-      if(is_null($connectionStr))
-        throw new Exception(__class__." Can't return an instance without any valid connection string.");
-      self::$defaultConnStr = $connectionStr;
-    }
-    if(is_null($connectionStr))
-      $connectionStr = self::$defaultConnStr;
-    if(isset(self::$instances[$connectionStr]))
-      return self::$instances[$connectionStr];
-    list($class,$params) = explode('://',$connectionStr);
-    $params = explode(';',$params);
-    $paramNb = count($params);
-    for($i=0;$i<$paramNb;++$i){
-      $pEval[] = "\$params[$i]";
-    }
-    if(! class_exists($class) )
+	/**
+	* return a single instance of the database corresponding to the given connection String.
+	* This method must be copyed in the exended class as php is not able to get the name of the calling class (one more poor aspect of this language).
+	* @param string $connectionStr the connection string is a semi colon separated list
+	*                              of connection parameter in the order they appear in the constructor
+	*                              preceeded by classname://
+	*                              for exemple a mysqldb connection string will look like:
+	*                              "mysqldb://dbname;dbhost:port;dbuser;dbpass"
+	*                              and a sqlitedb one will look like:
+	*                              "sqlitedb://dbfile;mode"
+	* @param bool $setDefault      if true then this database connection will be the default one
+	*                              returned when no arguments are given.
+	*                              For conveniance the first call to this method
+	*                              will set the corresponding instance the default one
+	*                              if none has been set before
+	* @return db instance
+	*/
+	static public function getInstance($connectionStr=null,$setDefault=false){
+		if( is_null(self::$defaultConnStr) ){
+			if(is_null($connectionStr))
+				throw new Exception(__class__." Can't return an instance without any valid connection string.");
+			self::$defaultConnStr = $connectionStr;
+		}
+		if(is_null($connectionStr))
+			$connectionStr = self::$defaultConnStr;
+		if(isset(self::$instances[$connectionStr]))
+			return self::$instances[$connectionStr];
+		list($class,$params) = explode('://',$connectionStr);
+		$params = explode(';',$params);
+		$paramNb = count($params);
+		for($i=0;$i<$paramNb;++$i){
+			$pEval[] = "\$params[$i]";
+		}
+		if(! class_exists($class) )
 			require (dirname(__file__)."/class-$class.php");
-    eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
-    return self::$instances[$connectionStr] = $instance;
-  }
+		eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
+		return self::$instances[$connectionStr] = $instance;
+	}
 
-  static public function setDefaultConnectionStr($connectionStr){
-    self::$defaultConnStr = $connectionStr;
-  }
-  /**
-  * This way of creating an instance is not encourage anymore!
-  * @deprecated use @see getInstance instead
-  * constructor stay public even if we have getInstance for 2 reason
-  * 1- backward compatibility with existing scripts
-  * 2- permit getInstance to create any derived class without redefining it in each subclass
-  */
+	static public function setDefaultConnectionStr($connectionStr){
+		self::$defaultConnStr = $connectionStr;
+	}
+	/**
+	* This way of creating an instance is not encourage anymore!
+	* @deprecated use @see getInstance instead
+	* constructor stay public even if we have getInstance for 2 reason
+	* 1- backward compatibility with existing scripts
+	* 2- permit getInstance to create any derived class without redefining it in each subclass
+	*/
 	public function __construct(){
 		if(self::$autoconnect)
 			$this->open();
 	}
 
-  public function __destruct(){
-    foreach( self::$instances as $k=>$db){
-      self::$instances[$k]->close();
-      unset($db,self::$instances[$k]);
-    }
-    $this->close(); #- close current object connection if not obtained by getInstance
-  }
+	public function __destruct(){
+		foreach( self::$instances as $k=>$db){
+			self::$instances[$k]->close();
+			unset($db,self::$instances[$k]);
+		}
+		$this->close(); #- close current object connection if not obtained by getInstance
+	}
 
 	function __call($m,$a){
 		if( isset(self::$aliases[$m]) )
 			return call_user_func_array(array($this,self::$aliases[$m]),$a);
-  }
+	}
 	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
 
 	/** open connection to database */
@@ -697,7 +697,7 @@ class db{
 			$this->error[$i]['str'] = $this->error_str($this->error[$i]['nb']);
 		}
 		$this->last_error = $this->error[$i];
-    $this->verbose($this->error[$i]['str'],$callingfunc,1);
+		$this->verbose($this->error[$i]['str'],$callingfunc,1);
 		$i++;
 	}
 
@@ -712,22 +712,22 @@ class db{
 	* @private
 	*/
 	protected function verbose($msg,$callingFunc=null,$msgLvl=1){
-	  if(! $this->beverbose)
-	    return;
-    if( ($msgLvl===2 && $this->beverbose >=2) || ($msgLvl === 1 && $this->beverbose !== 2) ){
-      $msg = get_class($this).($callingFunc?"::$callingFunc":'').' => '.$msg;
-      $useConsoleApp = ( php_sapi_name()=='cli' && class_exists('console_app',false))?true:false;
-      $isError = $msgLvl===1?true:false;
-      if($isError){
-        if($useConsoleApp)
-          return console_app::msg_error($msg);
-        echo "<b style=\"color:red;\">[ERROR] $msg</b><br />\n";
-      }else{
-        if($useConsoleApp)
-          return console_app::msg_info($msg);
-        echo "<b style=\"color:blue;\">$msg</b><br />\n";
-      }
-    }
+		if(! $this->beverbose)
+			return;
+		if( ($msgLvl===2 && $this->beverbose >=2) || ($msgLvl === 1 && $this->beverbose !== 2) ){
+			$msg = get_class($this).($callingFunc?"::$callingFunc":'').' => '.$msg;
+			$useConsoleApp = ( php_sapi_name()=='cli' && class_exists('console_app',false))?true:false;
+			$isError = $msgLvl===1?true:false;
+			if($isError){
+				if($useConsoleApp)
+					return console_app::msg_error($msg);
+				echo "<b style=\"color:red;\">[ERROR] $msg</b><br />\n";
+			}else{
+				if($useConsoleApp)
+					return console_app::msg_info($msg);
+				echo "<b style=\"color:blue;\">$msg</b><br />\n";
+			}
+		}
 	}
 
 	###*** DEPRECATED METHODS ***###
