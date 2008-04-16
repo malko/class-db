@@ -55,54 +55,54 @@ require_once(dirname(__file__).'/class-db.php');
 class modelGenerator{
 	public $connectionStr = '';
 	/** class-db active instance */
-  protected $db = null;
-  /** fullpath to output directories */
-  public $outputDir = '/tmp/';
+	protected $db = null;
+	/** fullpath to output directories */
+	public $outputDir = '/tmp/';
 
-  /**
-  * do we try to auto map relationships at generation time.
-  * be sure to correctly check the results when doing this, automatic generators are really
-  * far from perfect, it will handle some case well, forgive some and worst can mistake some other
-  * Try this on and if you think thats not good enough turn this off
-  * @see coming next documentation on how does this work.
-  */
-  public $autoMap = true;
-  /**
-  * what to do when a given model file is found (extended models are always skip when exists)
-  * o => overwrite existing models but leave extended models as is
-  * a => append the new model to the existing one you must have a look to files and delete one of the generated class
-  *      can be usefull on updates to check relationships by hands for example. (this is the default behaviour)
-  *      leave extended models as is
-  * s => skip generation of this model so only new models are generated usefull when you add some tables to your database
-  */
-  public $onExist = 'a';
+	/**
+	* do we try to auto map relationships at generation time.
+	* be sure to correctly check the results when doing this, automatic generators are really
+	* far from perfect, it will handle some case well, forgive some and worst can mistake some other
+	* Try this on and if you think thats not good enough turn this off
+	* @see coming next documentation on how does this work.
+	*/
+	public $autoMap = true;
+	/**
+	* what to do when a given model file is found (extended models are always skip when exists)
+	* o => overwrite existing models but leave extended models as is
+	* a => append the new model to the existing one you must have a look to files and delete one of the generated class
+	*      can be usefull on updates to check relationships by hands for example. (this is the default behaviour)
+	*      leave extended models as is
+	* s => skip generation of this model so only new models are generated usefull when you add some tables to your database
+	*/
+	public $onExist = 'a';
 
-  /**
-  * create an instance of modelGenerator.
-  * @param string $dbConenctionStr
-  * @param string $outputDir
-  * @param int    $dbVerboseLevel
-  */
-  function __construct($dbConnectionStr,$outputDir=null,$dbVerboseLevel=0){
-  	$this->connectionStr = $dbConnectionStr;
-    $this->db = db::getInstance($this->connectionStr);
-    $this->db->beverbose = (int) $dbVerboseLevel;
-    if(! is_null($outputDir) )
-      $this->outputDir = substr($outputDir,-1)==='/'?$outputDir:$outputDir.'/';
-    if(! is_dir($this->outputDir) ){
+	/**
+	* create an instance of modelGenerator.
+	* @param string $dbConenctionStr
+	* @param string $outputDir
+	* @param int    $dbVerboseLevel
+	*/
+	function __construct($dbConnectionStr,$outputDir=null,$dbVerboseLevel=0){
+		$this->connectionStr = $dbConnectionStr;
+		$this->db = db::getInstance($this->connectionStr);
+		$this->db->beverbose = (int) $dbVerboseLevel;
+		if(! is_null($outputDir) )
+			$this->outputDir = substr($outputDir,-1)==='/'?$outputDir:$outputDir.'/';
+		if(! is_dir($this->outputDir) ){
 			if( false===mkdir($this->outputDir,0770,true))
 				throw new Exception("Can't create output dir $this->outputDir.");
 		}
-  }
+	}
 
-  /**
+	/**
 	* generate class for each table in database.
 	* @param string $prefix               add a prefix to generated models
 	* @param string $dbConnectionDefined  an optionnal defined dbConnectionStr to use as a replacement for connectionStr
 	*                                     really usefull when you want to change the database connection string without
 	*                                     editing all models.
 	*/
-  function doGeneration($dbConnectionDefined=null,$prefix='model'){
+	function doGeneration($dbConnectionDefined=null,$prefix='model'){
 		#- get table list
 		$tables  = $this->db->list_tables();
 		if(! $tables)
@@ -261,12 +261,12 @@ class modelGenerator{
 		foreach( $modelDesc as $k=>$f){
 			if( in_array($k,array('PK','hasMany','hasOne'),true))
 				continue;
-      if( strrpos($f['Key'],'PRI')===0 && $f['Default'] === null )
-      	$f['Default'] = 0;
+			if( strrpos($f['Key'],'PRI')===0 && $f['Default'] === null )
+				$f['Default'] = 0;
 
-      $datas[]       = "'$f[Field]' => '$f[Default]', // $f[Type];";
-      $datasTypes[]  = "'$f[Field]' => array('Type'=>'$f[Type]', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>'$f[Default]'),";
-    }
+			$datas[]       = "'$f[Field]' => '$f[Default]', // $f[Type];";
+			$datasTypes[]  = "'$f[Field]' => array('Type'=>'$f[Type]', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>'$f[Default]'),";
+		}
 
 		#- ~ prepare hasOne
 		$hasOnes[] = "// 'relName'=> array('modelName'=>'modelName','relType'=>'ignored|dependOn|requireBy',['localField'=>'fldNameIfNotPrimaryKey','foreignField'=>'fldNameIfNotPrimaryKey','foreignDefault'=>'ForeignFieldValueOnDelete'])";
@@ -293,46 +293,46 @@ class modelGenerator{
 
 		$modelName = self::__prefix($tableName,$prefix);
 
-    $str = "<?php
-/**
-* autoGenerated on ".date('Y-m-d')."
-* @package models
-*/
-class BASE_$modelName extends abstractModel{
+		$str = "<?php
+	/**
+	* autoGenerated on ".date('Y-m-d')."
+	* @package models
+	*/
+	class BASE_$modelName extends abstractModel{
 
-  protected \$datas = array(
-    ".implode("\n\t\t",$datas)."
-  );
+	protected \$datas = array(
+		".implode("\n\t\t",$datas)."
+	);
 
-  static protected \$filters = array();
+	static protected \$filters = array();
 
-  static protected \$hasOne = array(
-  	".implode("\n\t\t",$hasOnes)."
-  );
-  static protected \$hasMany = array(
-  	".implode("\n\t\t",$hasManys)."
-  );
+	static protected \$hasOne = array(
+		".implode("\n\t\t",$hasOnes)."
+	);
+	static protected \$hasMany = array(
+		".implode("\n\t\t",$hasManys)."
+	);
 
-  /** database link */
-  protected \$dbConnectionDescriptor = $dbConnectionDefined;
-  protected \$dbAdapter = null;
+	/** database link */
+	protected \$dbConnectionDescriptor = $dbConnectionDefined;
+	protected \$dbAdapter = null;
 
-  static protected \$modelName = 'BASE_$modelName';
-  static protected \$tableName = '$tableName';
-  static protected \$primaryKey = '$modelDesc[PK]';
+	static protected \$modelName = 'BASE_$modelName';
+	static protected \$tableName = '$tableName';
+	static protected \$primaryKey = '$modelDesc[PK]';
 
-  /**
-  * field information about type, default values and so on
-  */
-  static protected \$datasDefs = array(
-    ".implode("\n\t\t",$datasTypes)."
-  );
+	/**
+	* field information about type, default values and so on
+	*/
+	static protected \$datasDefs = array(
+		".implode("\n\t\t",$datasTypes)."
+	);
 
-  static public function getNew(){
+	static public function getNew(){
 		return abstractModel::getModelInstance('$modelName');
 	}
 
-  static public function getInstance(\$PK=null){
+	static public function getInstance(\$PK=null){
 		return abstractModel::getModelInstance('$modelName',\$PK);
 	}
 
@@ -345,11 +345,7 @@ class BASE_$modelName extends abstractModel{
 	}
 
 	static public function getFilteredInstancesByField(\$field,\$filterType,\$args=null){
-		if(! isset(self::\$datasDefs[\$field]) ){
-			#- try to lower the first char of field
-			throw new Exception('$modelName::getFilteredInstancesByField() invalid parameter field(\$field) must be a valid $modelName::datas fieldName.');
-		}
-		return abstractModel::getFilteredModelInstancesByField('$modelName',\$field,\$filterType,\$args=null);
+		return abstractModel::getFilteredModelInstancesByField('$modelName',\$field,\$filterType,\$args);
 	}
 	static public function getInstanceFromDatas(\$datas,\$dontOverideIfExists=false,\$bypassFilters=false){
 		return abstractModel::getModelInstanceFromDatas('$modelName',\$datas,\$dontOverideIfExists,\$bypassFilters);
@@ -359,26 +355,26 @@ class BASE_$modelName extends abstractModel{
 	}
 
 	/**
-  * permit to access static dynamic methods such as getByFieldnameLessThan for php >= 5.3
-  * where fieldName is a modelName::\$datas key
-  * (will work like this: modelName::getByFieldnameLessThan(\$value));
-  * In the time waiting for this to be handled in future version of php (at this time latest stable release is still 5.2)
-  * we can use it like this: modelName::__callstatic('getByFieldnameLessThan',array(\$value))
-  * (with late stating binding enable we should move this to abstractModel and replace '\$modelName' by static)
-  */
-  static public function __callstatic(\$m,\$a){
-  	#- manage common filter getter
+	* permit to access static dynamic methods such as getByFieldnameLessThan for php >= 5.3
+	* where fieldName is a modelName::\$datas key
+	* (will work like this: modelName::getByFieldnameLessThan(\$value));
+	* In the time waiting for this to be handled in future version of php (at this time latest stable release is still 5.2)
+	* we can use it like this: modelName::__callstatic('getByFieldnameLessThan',array(\$value))
+	* (with late stating binding enable we should move this to abstractModel and replace '\$modelName' by static)
+	*/
+	static public function __callstatic(\$m,\$a){
+		#- manage common filter getter
 		if(preg_match('!getBy('.implode('|',array_keys(self::\$datasDefs)).')((?:(?:Less|Greater)(?:Equal)?Than)|Between|(?:Not)?(?:Null|Equal|Like|In))!',\$m,\$match)){
 			return call_user_func('abstractModel::getFilteredModelInstancesByField','$modelName',\$match[1],\$match[2],\$a);
 		}
-  }
-  /**
-  * return a static property of the model (even protected).
-  * @param string \$propName name of the static property to retrieve.
-  * @return mixed
-  */
-  static public function _getStatic(\$propName){
-  	return abstractModel::_getModelStaticProp('$modelName',\$propName);
+	}
+	/**
+	* return a static property of the model (even protected).
+	* @param string \$propName name of the static property to retrieve.
+	* @return mixed
+	*/
+	static public function _getStatic(\$propName){
+		return abstractModel::_getModelStaticProp('$modelName',\$propName);
 	}
 	static public function _getDbAdapter(){
 		return abstractModel::getModelDbAdapter('$modelName');
@@ -395,13 +391,13 @@ $str2 = "<?php
 
 require dirname(__file__).'/BASE_$modelName.php';
 
-class $modelName extends BASE_$modelName{
+	class $modelName extends BASE_$modelName{
 	// define here all your user defined stuff so you don't bother updating BASE_$modelName class
 	// should also be the place to redefine anything to overwrite what has been unproperly generated in BASE_$modelName class
 	/**
-  * list of filters used as callback when setting datas in fields.
-  * this permitt to automate the process of checking datas setted.
-  * array('fieldName' => array( callable filterCallBack, array additionalParams, str errorLogMsg, mixed \$errorValue=false);
+	* list of filters used as callback when setting datas in fields.
+	* this permitt to automate the process of checking datas setted.
+	* array('fieldName' => array( callable filterCallBack, array additionalParams, str errorLogMsg, mixed \$errorValue=false);
 	* 	minimal callback prototype look like this:
 	* 	function functionName(mixed \$value)
 	* 	callback have to return the sanitized value or false if this value is not valid
@@ -411,10 +407,10 @@ class $modelName extends BASE_$modelName{
 	*   \$errorValue is totally optional and permit to specify a different error return value for filter than false
 	*   (can be usefull when you use filter_var to check boolean for example)
 	* )
-  */
-  static protected \$filters = array();
+	*/
+	static protected \$filters = array();
 
-  static protected \$modelName = '$modelName';
+	static protected \$modelName = '$modelName';
 
 }
 ";

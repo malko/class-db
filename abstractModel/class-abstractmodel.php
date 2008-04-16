@@ -279,6 +279,8 @@ class modelCollection extends arrayObject{
 	* return current model
 	*/
 	function current(){
+		if(count($this) < 1)
+			return false;
 		return $this->getIterator()->current();
 	}
 	/**
@@ -335,15 +337,15 @@ class modelCollection extends arrayObject{
 }
 
 abstract class abstractModel{
-  /**
-  * internal pointer to datas
-  */
-  protected $datas = array();
+	/**
+	* internal pointer to datas
+	*/
+	protected $datas = array();
 
-  /**
-  * list of filters used as callback when setting datas in fields.
-  * this permitt to automate the process of checking datas setted.
-  * array('fieldName' => array( callable filterCallBack, array additionalParams, str errorLogMsg, mixed $errorValue=false);
+	/**
+	* list of filters used as callback when setting datas in fields.
+	* this permitt to automate the process of checking datas setted.
+	* array('fieldName' => array( callable filterCallBack, array additionalParams, str errorLogMsg, mixed $errorValue=false);
 	* 	minimal callback prototype look like this:
 	* 	function functionName(mixed $value)
 	* 	callback have to return the sanitized value or false if this value is not valid
@@ -353,99 +355,98 @@ abstract class abstractModel{
 	*   $errorValue is totally optional and permit to specify a different error return value for filter than false
 	*   (can be usefull when you use filter_var to check boolean for example)
 	* )
-  */
-  static protected $filters = array();
-  /**
-  * list of error messages returned by filters
-  */
-  protected $filtersMsgs = array();
-  #- set this on true to bypass filters when required (modelCollection use at loadDatas() time)
-  public $bypassFilters = false;
+	*/
+	static protected $filters = array();
+	/**
+	* list of error messages returned by filters
+	*/
+	protected $filtersMsgs = array();
+	#- set this on true to bypass filters when required (modelCollection use at loadDatas() time)
+	public $bypassFilters = false;
 
-  /**
-  * specify one to one relations between models
-  */
-  static protected $hasOne = array(
-    // 'relName'=> array('modelName'=>'modelName','localField'=>'fieldName','foreignField'=>'fieldName','relType'=>'ignored|dependOn|requireBy')
-  );
-  /**
-  * specify one to many relations between models
-  */
-  static protected $hasMany = array(
-  	// 'relName'=> array('modelName'=>'modelName','localField'=>'fldName','foreignField'=>'fldName','relType'=>'ignored|dependOn|requireBy',
-  	//                   ['linkTable'=>'tableName','linkLocalField'=>'fldName',''=>'linkForeignField'=>'fldName']])
-  );
+	/**
+	* specify one to one relations between models
+	*/
+	static protected $hasOne = array(
+		// 'relName'=> array('modelName'=>'modelName','localField'=>'fieldName','foreignField'=>'fieldName','relType'=>'ignored|dependOn|requireBy')
+	);
+	/**
+	* specify one to many relations between models
+	*/
+	static protected $hasMany = array(
+		// 'relName'=> array('modelName'=>'modelName','localField'=>'fldName','foreignField'=>'fldName','relType'=>'ignored|dependOn|requireBy',
+		//                   ['linkTable'=>'tableName','linkLocalField'=>'fldName',''=>'linkForeignField'=>'fldName']])
+	);
 
-  /* internal pointer to hasOne related models */
-  protected $_oneModels = array();
-  /* internal pointer to hasMany related models (modelCollections) */
-  protected $_manyModels = array();
+	/* internal pointer to hasOne related models */
+	protected $_oneModels = array();
+	/* internal pointer to hasMany related models (modelCollections) */
+	protected $_manyModels = array();
 
-  /**
-  * each model has it's own pointer to the database
-  */
-  protected $dbAdapter = null;
-  protected $dbConnectionDescriptor = null;
+	/**
+	* each model has it's own pointer to the database
+	*/
+	protected $dbAdapter = null;
+	protected $dbConnectionDescriptor = null;
 
-  /** used to know if save is required(1) or in progress(-1) */
-  protected $needSave = 0;
-  protected $deleted  = false;
+	/** used to know if save is required(1) or in progress(-1) */
+	protected $needSave = 0;
+	protected $deleted  = false;
 
-  static protected $modelName = 'abstractModel';
-  /**
-  * the table name in database
-  */
-  static protected $tableName = '';
-  /**
-  * name of the field used as a primary key
-  */
-  static protected $primaryKey = 'id';
+	static protected $modelName = 'abstractModel';
+	/**
+	* the table name in database
+	*/
+	static protected $tableName = '';
+	/**
+	* name of the field used as a primary key
+	*/
+	static protected $primaryKey = 'id';
 
-  /**
-  * will keep trace of each model instances to permit uniques instances
-  * of any models.
-  */
-  static protected $instances = array();
-  /**
-  * just a place to keep some various internal datas to avoid of preparing them more than once
-  * (for exemples some regexps inside magic methods)
-  */
-  static private $_internals = array();
+	/**
+	* will keep trace of each model instances to permit uniques instances
+	* of any models.
+	*/
+	static protected $instances = array();
+	/**
+	* just a place to keep some various internal datas to avoid of preparing them more than once
+	* (for exemples some regexps inside magic methods)
+	*/
+	static private $_internals = array();
 
 	/**
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
 	*/
-  static public $useDbProfiler = true;
+	static public $useDbProfiler = true;
 
-  /**
-  * only for debug purpose
-  * @todo delete this debug method
-  */
-  static public function showInstances($compact=false){
-  	if(! $compact)
-  		return show(self::$instances);
-  	foreach(self::$instances as $model=>$instances){
+	/**
+	* only for debug purpose
+	* @todo delete this debug method
+	*/
+	static public function showInstances($compact=false){
+		if(! $compact)
+			return show(self::$instances);
+		foreach(self::$instances as $model=>$instances){
 			$res[$model] = array_keys($instances);
 		}
 		show($res);
-  }
-  /**
-  * create an instance of model.
-  * @param str  $PK       if given retrieve the datas for the given primary key object.
-  *                       else return a new empty model object.
-  * @param bool $fullLoad if true then will load all related object at construction time.
-  *
-  */
-  protected function __construct($PK=null){
-  	#- ~ $this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
-  	$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
-  	if( self::$useDbProfiler )
-  	$this->dbAdapter = new dbProfiler($this->dbAdapter);
-  	$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-  	if( $PK !== null){
-  		$this->datas = $this->dbAdapter->select_single_to_array(self::_getModelStaticProp($this,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
-  		#- ~ foreach($this->datas as $k=>$v){
-  			#- ~ self::setModelDatasType($this,$k,$this->datas[$k]);
+	}
+	/**
+	* create an instance of model.
+	* @param str  $PK       if given retrieve the datas for the given primary key object.
+	*                       else return a new empty model object.
+	* @param bool $fullLoad if true then will load all related object at construction time.
+	*
+	*/
+	protected function __construct($PK=null){
+		$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
+		if( self::$useDbProfiler )
+		$this->dbAdapter = new dbProfiler($this->dbAdapter);
+		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
+		if( $PK !== null){
+			$this->datas = $this->dbAdapter->select_single_to_array(self::_getModelStaticProp($this,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
+			#- ~ foreach($this->datas as $k=>$v){
+				#- ~ self::setModelDatasType($this,$k,$this->datas[$k]);
 			#- ~ }
 		}else{
 			$this->datas[$primaryKey] = uniqid('abstractModelTmpId',true);
@@ -456,30 +457,30 @@ abstract class abstractModel{
 			#- prepare related keys exp
 			foreach(array_keys(self::_getModelStaticProp($this,'hasOne')) as $k)
 				$oneKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-	    self::$_internals[get_class($this)]['hasOneKeyExp'] = implode('|',$oneKeys);
+			self::$_internals[get_class($this)]['hasOneKeyExp'] = implode('|',$oneKeys);
 			foreach(array_keys(self::_getModelStaticProp($this,'hasMany')) as $k)
 				$manyKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-	    self::$_internals[get_class($this)]['hasManyKeyExp'] = implode('|',$manyKeys);
-	    self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasManyKeyExp']
-	    	.((count($oneKeys)&&count($manyKeys))?'|':'')
-	    	.self::$_internals[get_class($this)]['hasManyKeyExp'];
-	    #- prepare datas keys exp
-	    foreach(array_keys($this->datas) as $k)
+			self::$_internals[get_class($this)]['hasManyKeyExp'] = implode('|',$manyKeys);
+			self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasManyKeyExp']
+				.((count($oneKeys)&&count($manyKeys))?'|':'')
+				.self::$_internals[get_class($this)]['hasManyKeyExp'];
+			#- prepare datas keys exp
+			foreach(array_keys($this->datas) as $k)
 				$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-	    self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
+			self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
 		}
 	}
 
-  /**
-  * used internally to permit unique object instance on newly inserted models.
-  * @param abstractModel $instance.
-  * @private
-  */
-  static private function _setInstanceKey(abstractModel $instance,$oldKey=null){
-  	if($oldKey !== null) # remove temporary key at save time
-  		unset(self::$instances[strtolower(get_class($instance))][$oldKey]);
-  	self::$instances[strtolower(get_class($instance))][$instance->PK] = $instance;
-  	#- then update related models with correct values
+	/**
+	* used internally to permit unique object instance on newly inserted models.
+	* @param abstractModel $instance.
+	* @private
+	*/
+	static private function _setInstanceKey(abstractModel $instance,$oldKey=null){
+		if($oldKey !== null) # remove temporary key at save time
+			unset(self::$instances[strtolower(get_class($instance))][$oldKey]);
+		self::$instances[strtolower(get_class($instance))][$instance->PK] = $instance;
+		#- then update related models with correct values
 	}
 
 	/**
@@ -502,16 +503,16 @@ abstract class abstractModel{
 		return $instance;
 	}
 
-  /**
-  * return an instance of $modelName and set instance datas.
-  * if $datas contains a field with primaryKey it will check first for a living instance (already loaded  not existing in database) of the given datas
-  * @param string $modelName
-  * @param array  $datas
-  * @param bool   $dontOverideIfExists this only make sense if you have the primaryKey field set in datas
-  *                                     in this case if true and a living instance (not checked in database but in loaded instances) is found then it will simply return the instance as found
-  *                                     else it will set instance datas to the one given. (can be of help to set multiple keys at once)
-  * @param bool   $bypassFilters       if true then will bypass datas filtering
-  */
+	/**
+	* return an instance of $modelName and set instance datas.
+	* if $datas contains a field with primaryKey it will check first for a living instance (already loaded  not existing in database) of the given datas
+	* @param string $modelName
+	* @param array  $datas
+	* @param bool   $dontOverideIfExists this only make sense if you have the primaryKey field set in datas
+	*                                     in this case if true and a living instance (not checked in database but in loaded instances) is found then it will simply return the instance as found
+	*                                     else it will set instance datas to the one given. (can be of help to set multiple keys at once)
+	* @param bool   $bypassFilters       if true then will bypass datas filtering
+	*/
 	static public function getModelInstanceFromDatas($modelName,$datas,$dontOverideIfExists=false,$bypassFilters=false){
 		# check for living instance
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
@@ -560,7 +561,7 @@ abstract class abstractModel{
 		return $this;
 	}
 
-  /**
+	/**
 	* return array of abstractModel instances by primaryKeys
 	* @param string $modelName
 	* @param array  $PKs primary keys of desired models
@@ -570,19 +571,39 @@ abstract class abstractModel{
 		return new modelCollection($modelName,empty($PKs)?$PKs:array_combine($PKs,$PKs));
 	}
 
-  /**
-  * return multiple instances of modelName that match simple given filter
-  * @param string $modelName
-  * @param array  $filter    same as conds in class-db methods
+	/**
+	* return multiple instances of modelName that match simple given filter
+	* @param string $modelName
+	* @param array  $filter    same as conds in class-db methods
 	* @return modelCollection indexed by their primaryKeys
-  */
-  static public function getFilteredModelInstances($modelName,$filter=null){
-  	#@todo find a way to avoid use of a tmpModel
-  	$tableName  = self::_getModelStaticProp($modelName,'tableName');
-  	$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
-  	$db = self::getModelDbAdapter($modelName);
-  	$PKs = $db->select_col($tableName,$primaryKey,$filter);
-  	return self::getMultipleModelInstances($modelName,empty($PKs)?array():$PKs);
+	*/
+	static public function getFilteredModelInstances($modelName,$filter=null){
+		#@todo find a way to avoid use of a tmpModel
+		$tableName  = self::_getModelStaticProp($modelName,'tableName');
+		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
+		$db = self::getModelDbAdapter($modelName);
+		$PKs = $db->select_col($tableName,$primaryKey,$filter);
+		return self::getMultipleModelInstances($modelName,empty($PKs)?array():$PKs);
+	}
+
+	/**
+	* return all instances of modelName in databases and load them all at once
+	* @param string $modelName
+	* @param string $withRelated string of related stuffs to load at the same time. multiple values are separated by |
+	* @return modelCollection indexed by their primaryKeys
+	*/
+	static public function getAllModelInstances($modelName,$withRelated=null){
+		$tableName  = self::_getModelStaticProp($modelName,'tableName');
+		$db = self::getModelDbAdapter($modelName);
+		$rows = $db->select_rows($tableName);
+		$collection = new modelCollection($modelName);
+		if( $rows ===false )
+			return $collection;
+		foreach($rows as $row)
+			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
+		if( null !== $withRelated )
+			$collection->loadDatas($withRelated);
+		return $collection;
 	}
 
 	/*
@@ -592,10 +613,10 @@ abstract class abstractModel{
 
 	}//*/
 
-  static public function getFilteredModelInstancesByField($modelName,$field,$filterType,$args=null){
-  	show(func_get_args());
-  	static $filterTypes;
-  	if(! isset($filterTypes) ){
+	static public function getFilteredModelInstancesByField($modelName,$field,$filterType,$args=null){
+		show(func_get_args());
+		static $filterTypes;
+		if(! isset($filterTypes) ){
 			$filterTypes = array(
 				'GreaterThan'      => '>?',
 				'GreaterEqualThan' => '>=?',
@@ -630,14 +651,14 @@ abstract class abstractModel{
 		return abstractModel::getFilteredModelInstances($modelName,$args);
 	}
 
-  /**
+	/**
 	* check if there is any living (already loaded) instance of the given model for matching PK
 	* @param string $modelName   model name
 	* @param mixed  $PK          value of the primary key
 	* @param bool   $returnModel set this to true to return living model instead of true on success
 	* @return bool or abstractModel if $returnModel is true
 	*/
-  static public function isLivingModelInstance($modelName,$PK,$returnModel=false){
+	static public function isLivingModelInstance($modelName,$PK,$returnModel=false){
 		if(! isset(self::$instances[strtolower($modelName)][$PK]))
 			return false;
 		return $returnModel?self::$instances[strtolower($modelName)][$PK]:true;
@@ -674,15 +695,15 @@ abstract class abstractModel{
 		return $valids[$modelName][$PK]=$PKExists?true:false;
 	}
 
-  /**
-  * return living instance or make it for relationnal objects
-  * @param string $relName the key used to define the relation
-  * @return abstractModel or modelCollection repending on the type of relation
-  */
-  public function getRelated($relName){
-  	#- hasOne related
-  	$hasOne = self::_getModelStaticProp($this,'hasOne');
-  	if(isset($hasOne[$relName])){
+	/**
+	* return living instance or make it for relationnal objects
+	* @param string $relName the key used to define the relation
+	* @return abstractModel or modelCollection repending on the type of relation
+	*/
+	public function getRelated($relName){
+		#- hasOne related
+		$hasOne = self::_getModelStaticProp($this,'hasOne');
+		if(isset($hasOne[$relName])){
 			if(! empty($this->_oneModels[$relName]))
 				return $this->_oneModels[$relName];
 			$relDef = $hasOne[$relName];
@@ -738,38 +759,39 @@ abstract class abstractModel{
 		throw new Exception(get_class($this)."::getRelated($relName) unknown relation");
 	}
 
-  public function isRelatedSet($k){
+	public function isRelatedSet($k){
 		return !(empty($this->_oneModels[$k]) && empty($this->_manyModels[$k]));
 	}
-  ###--- MAGIC METHODS ---###
-  public function __get($k){
-  	#- first check primary key
-  	if( $k === 'PK' )
-      return $this->datas[self::_getModelStaticProp($this,'primaryKey')];
-  	$hasOne = self::_getModelStaticProp($this,'hasOne');
-  	$hasMany = self::_getModelStaticProp($this,'hasMany');
-  	#- then check related objects first
-  	if( isset($hasOne[$k]) || isset($hasMany[$k]) )
-  		return $this->getRelated($k);
 
-  	#- then check for datas values
-  	if( isset($this->datas[$k]) )
+	###--- MAGIC METHODS ---###
+	public function __get($k){
+		#- first check primary key
+		if( $k === 'PK' )
+			return $this->datas[self::_getModelStaticProp($this,'primaryKey')];
+		$hasOne = self::_getModelStaticProp($this,'hasOne');
+		$hasMany = self::_getModelStaticProp($this,'hasMany');
+		#- then check related objects first
+		if( isset($hasOne[$k]) || isset($hasMany[$k]) )
+			return $this->getRelated($k);
+
+		#- then check for datas values
+		if( isset($this->datas[$k]) )
 				return $this->datas[$k];
-    #- then protected properties (make them kind of read only values)
-    if( isset($this->$k) )
-      return $this->$k;
+		#- then protected properties (make them kind of read only values)
+		if( isset($this->$k) )
+			return $this->$k;
 
-    #- nothing left throw an exception
-    throw new Exception(get_class($this)."::$k unknown property.");
-  }
+		#- nothing left throw an exception
+		throw new Exception(get_class($this)."::$k unknown property.");
+	}
 
-  /**
-  * setter for datas and hasOne relations
-  */
-  public function __set($k,$v){
-  	if($k === 'PK' || $k === self::_getModelStaticProp($this,'primaryKey') ){
-      throw new Exception(get_class($this)." primaryKey can not be set by user.");
-    }
+	/**
+	* setter for datas and hasOne relations
+	*/
+	public function __set($k,$v){
+		if($k === 'PK' || $k === self::_getModelStaticProp($this,'primaryKey') ){
+			throw new Exception(get_class($this)." primaryKey can not be set by user.");
+		}
 
 		#- apply filters
 		if(! $this->bypassFilters){
@@ -779,26 +801,26 @@ abstract class abstractModel{
 		}
 
 		#- call user defined setter first
-    if( method_exists($this,"set$k") ){
-    	return $this->{"set$k"}($this->bypassFilters?$v:$this->filterData($k,$v));
-    }
+		if( method_exists($this,"set$k") ){
+			return $this->{"set$k"}($this->bypassFilters?$v:$this->filterData($k,$v));
+		}
 
-    $this->needSave = 1;
-    $hasOne = self::_getModelStaticProp($this,'hasOne');
-    if(isset($hasOne[$k])){
-    	$relModelName   = $hasOne[$k]['modelName'];
-    	$thisPrimaryKey = self::_getModelStaticProp($this,'primaryKey');
-    	$localField   = empty($hasOne[$k]['localField'])? $thisPrimaryKey : $hasOne[$k]['localField'];
-    	if( is_object($v) ){
-    		if(! $v instanceof $relModelName)
-    			throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
-    		$this->_oneModels[$k] = $v;
+		$this->needSave = 1;
+		$hasOne = self::_getModelStaticProp($this,'hasOne');
+		if(isset($hasOne[$k])){
+			$relModelName   = $hasOne[$k]['modelName'];
+			$thisPrimaryKey = self::_getModelStaticProp($this,'primaryKey');
+			$localField   = empty($hasOne[$k]['localField'])? $thisPrimaryKey : $hasOne[$k]['localField'];
+			if( is_object($v) ){
+				if(! $v instanceof $relModelName)
+					throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
+				$this->_oneModels[$k] = $v;
 				if(isset($this->datas[$localField]) && $localField !== $thisPrimaryKey)
 					$this->datas[$localField] = $v->PK;
 				return $v;
 			}
 			#- here we deal with a non object value
-    	#- @todo in fact will be better to only check that the value is an existing key for model and not create an instance
+			#- @todo in fact will be better to only check that the value is an existing key for model and not create an instance
 			switch( $hasOne[$k]['relType']){
 				case 'dependOn': #- check for data integrity REQUIRED so if we must check in database load the model at this time
 					if($this->bypassFilters || self::existsModelPK($relModelName,$v))
@@ -815,9 +837,9 @@ abstract class abstractModel{
 			}
 		}
 
-  	#- ~ $hasMany = self::_getModelStaticProp($this,'hasMany');
+		#- ~ $hasMany = self::_getModelStaticProp($this,'hasMany');
 		/* Is this a good thing to set a collection at once and if yes reflexion on the fact it must be a collection not an array?
-    if(isset($hasMany[$k])){
+		if(isset($hasMany[$k])){
 			if(! $v instanceof modelCollection){
 				if( is_array($v) ){
 					$tmpCollection = new modelCollection($hasMany[$k]['modelName'],$v);
@@ -834,21 +856,21 @@ abstract class abstractModel{
 		if(isset($this->datas[$k]))
 			return $this->datas[$k] = self::setModelDatasType($this,$k,$v);
 
-    throw new Exception(get_class($this)." trying to set unknown property $k.");
+		throw new Exception(get_class($this)." trying to set unknown property $k.");
 
-  }
+	}
 
 	function __isset($k){
 		return isset($this->datas[$k]);
 	}
 
   public function __call($m,$a){
-    $className = get_class($this);
+		$className = get_class($this);
 
-    #- manage add methods for hasMany related
-    if(preg_match('!^append_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
-    	$relName = self::_cleanKey($this,'hasMany',$match[1]);
-    	if($relName===false)
+		#- manage add methods for hasMany related
+		if(preg_match('!^append_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
+			$relName = self::_cleanKey($this,'hasMany',$match[1]);
+			if($relName===false)
 				throw new Exception("$className trying to call unknown method $m with no matching hasMany[$match[1]] definition.");
 			$modelCollection = $this->getRelated($relName);
 			$model = array_shift($a);
@@ -861,9 +883,9 @@ abstract class abstractModel{
 			return $this; #- @todo make reflection on what should be return for now i thing taht allowing method chaining can be nice
 		}
 
-    #- manage setter methods for hasMany related
-    if( preg_match('!set_?('.self::$_internals[$className]['hasManyKeyExp'].')_?[cC]ollection$!',$m,$match) ){
-    	$relName = self::_cleanKey($this,'hasMany',$match[1]);
+		#- manage setter methods for hasMany related
+		if( preg_match('!set_?('.self::$_internals[$className]['hasManyKeyExp'].')_?[cC]ollection$!',$m,$match) ){
+			$relName = self::_cleanKey($this,'hasMany',$match[1]);
 			if($relName === false)
 				throw new Exception("$className::$m unknown hasMany relation.");
 			if( count($a) !== 1 )
@@ -877,47 +899,47 @@ abstract class abstractModel{
 			return $this; #- @todo make reflection on what should be return for now i thing that allowing method chaining can be nice
 		}
 
-    #- manage getter methods for related
-    if( preg_match('!^get_?('.self::$_internals[$className]['has*KeyExp'].')$!',$m,$match) )
-    	return $this->getRelated(self::_cleanKey($this,'hasOne',$match[1]));
+		#- manage getter methods for related
+		if( preg_match('!^get_?('.self::$_internals[$className]['has*KeyExp'].')$!',$m,$match) )
+			return $this->getRelated(self::_cleanKey($this,'hasOne',$match[1]));
 
-    #- manage setter/getter for datas ([gs]et_field|[gs]etField) case sensitive
-    if( preg_match('!^([gs]et)_?('.self::$_internals[$className]['datasKeyExp'].')$!',$m,$match) ){
-    	if($match[1]==='get'){
-    		return $this->datas[self::_cleanKey($this,'datas',$match[2])];
-    	}else{
-    		array_unshift($a,self::_cleanKey($this,'datas',$match[2]));
-    		call_user_func_array(array($this,'__set'),$a);
-    		return $this;
+		#- manage setter/getter for datas ([gs]et_field|[gs]etField) case sensitive
+		if( preg_match('!^([gs]et)_?('.self::$_internals[$className]['datasKeyExp'].')$!',$m,$match) ){
+			if($match[1]==='get'){
+				return $this->datas[self::_cleanKey($this,'datas',$match[2])];
+			}else{
+				array_unshift($a,self::_cleanKey($this,'datas',$match[2]));
+				call_user_func_array(array($this,'__set'),$a);
+				return $this;
 			}
-    }
+		}
 
-    #- nothing left throw an exception
-    throw new Exception("$className trying to call unknown method $m.");
-  }
+		#- nothing left throw an exception
+		throw new Exception("$className trying to call unknown method $m.");
+	}
 
-  ###--- FILTER RELATED METHODS ---###
-  /**
+	###--- FILTER RELATED METHODS ---###
+	/**
 	* internal method to get exact keys on magic methods call such as getRelName
 	* @param string $keyType hasOne|hasMany|datas|datasDefs
 	* @return string clean key or false if not find
 	* @private
 	*/
-  static private function _cleanKey($modelName,$keyType,$k){
-  	if( $keyType === 'datas')
-  		$keyType = 'datasDefs';
-  	$datas = self::_getModelStaticProp($modelName,$keyType);
-  	if( isset($datas[$k]) )
-  		return $k;
-  	#- try to lower first char first
-  	$k = strtolower($k[0]).substr($k,1);
+	static private function _cleanKey($modelName,$keyType,$k){
+		if( $keyType === 'datas')
+			$keyType = 'datasDefs';
+		$datas = self::_getModelStaticProp($modelName,$keyType);
 		if( isset($datas[$k]) )
-  		return $k;
-  	#- last try to upper first char first
-  	$k = ucfirst($k);
+			return $k;
+		#- try to lower first char first
+		$k = strtolower($k[0]).substr($k,1);
 		if( isset($datas[$k]) )
-  		return $k;
-  	return false;
+			return $k;
+		#- last try to upper first char first
+		$k = ucfirst($k);
+		if( isset($datas[$k]) )
+			return $k;
+		return false;
 	}
 
 	static public function setModelDatasType($modelName,$key,&$value){
@@ -937,19 +959,19 @@ abstract class abstractModel{
 		return $value;
 	}
 
-  /**
-  * apply filter to datas fields, as set in $this->filters or any user defined method named filterFieldName.
-  * return given filtered value or false if not succeed and then append a filterMsg.
-  * @param string $k the field to be set
-  * @param string $v the value to be set
-  * @return mixed or false in case of error.
-  */
-  public function filterData($k,$v){
-  	$filters = self::_getModelStaticProp($this,'filters');
-  	#- if no filters define check for a filterField method or simply return value
-  	if( empty($filters[$k]) )
-  		return (method_exists($this,"filter$k")?$v = $this->{"filter$k"}($v):$v);
-  	#- if we go there we have a $this->filter defined for this field so apply it
+	/**
+	* apply filter to datas fields, as set in $this->filters or any user defined method named filterFieldName.
+	* return given filtered value or false if not succeed and then append a filterMsg.
+	* @param string $k the field to be set
+	* @param string $v the value to be set
+	* @return mixed or false in case of error.
+	*/
+	public function filterData($k,$v){
+		$filters = self::_getModelStaticProp($this,'filters');
+		#- if no filters define check for a filterField method or simply return value
+		if( empty($filters[$k]) )
+			return (method_exists($this,"filter$k")?$v = $this->{"filter$k"}($v):$v);
+		#- if we go there we have a $this->filter defined for this field so apply it
 		if(count($filters[$k]) === 4){
 			list($cb,$params,$msg,$errorValue) = $filters[$k] ;
 		}else{
@@ -977,25 +999,25 @@ abstract class abstractModel{
 		$this->filtersMsgs[] = $msg;
 		return $this;
 	}
-  /**
-  * return bool
-  */
-  public function hasFiltersMsgs(){
-  	return ! empty($this->filtersMsgs);
-  }
-  /**
-  * return filters error msgs or false if none
-  * @param bool $resetMsgs  do exactly what it mean
-  * @return array or false
-  */
-  public function getFiltersMsgs($resetMsgs=false){
-  	$msgs = empty($this->filtersMsgs)?false:$this->filtersMsgs;
-  	if($resetMsgs)
-  		$this->filtersMsgs = array();
-  	return $msgs;
+	/**
+	* return bool
+	*/
+	public function hasFiltersMsgs(){
+		return ! empty($this->filtersMsgs);
+	}
+	/**
+	* return filters error msgs or false if none
+	* @param bool $resetMsgs  do exactly what it mean
+	* @return array or false
+	*/
+	public function getFiltersMsgs($resetMsgs=false){
+		$msgs = empty($this->filtersMsgs)?false:$this->filtersMsgs;
+		if($resetMsgs)
+			$this->filtersMsgs = array();
+		return $msgs;
 	}
 
-  ###--- SOME WAY TO DEAL WITH THE MISSING STATIC LATE BINDING (will probably change with PHP >= 5.3 ---###
+	###--- SOME WAY TO DEAL WITH THE MISSING STATIC LATE BINDING (will probably change with PHP >= 5.3 ---###
 	/**
 	* quick and dirty "hack" to permit access to static methods and property of models
 	* waiting for php >= 5.3 late static binding implementation
@@ -1047,13 +1069,13 @@ abstract class abstractModel{
 			return $returnDef?array('hasOne'=>$hasOne,'hasMany'=>$hasMany):true;
 	}
 
-  ###--- COMMON METHODS ---###
-  /**
-  * return a count of given model in database table.
-  * @param string $modelName model name you want count for
-  * @param array  $filters   same as conds in class-db permit you to count filtered models
-  * @return int or false on error
-  */
+	###--- COMMON METHODS ---###
+	/**
+	* return a count of given model in database table.
+	* @param string $modelName model name you want count for
+	* @param array  $filters   same as conds in class-db permit you to count filtered models
+	* @return int or false on error
+	*/
 	static public function getModelCount($modelName,$filter=null){
 		$tmpObj = new $modelName();
 		$tableName = self::_getModelStaticProp($modelName,'tableName');
@@ -1061,44 +1083,44 @@ abstract class abstractModel{
 		return $count===false?0:(int) $count;
 	}
 
-  /**
-  * optionnal method to let user define it's own primaryKey generation algorythm.
-  * (generally used when autoIncrement is not set on the primaryKey)
-  * @return primaryKey
-  * @private
-  * protected function _newPrimaryKey(){}
-  */
+	/**
+	* optionnal method to let user define it's own primaryKey generation algorythm.
+	* (generally used when autoIncrement is not set on the primaryKey)
+	* @return primaryKey
+	* @private
+	* protected function _newPrimaryKey(){}
+	*/
 
-  /**
-  * optionnal method onBeforeSave to let user define any action to take before the save to start
-  * if return true then abort the save process without any warning in the save method.
-  * So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own
-  * @private
-  * protected function onBeforeSave(){}
-  */
+	/**
+	* optionnal method onBeforeSave to let user define any action to take before the save to start
+	* if return true then abort the save process without any warning in the save method.
+	* So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own
+	* @private
+	* protected function onBeforeSave(){}
+	*/
 
 
-  /**
-  * save the Model to database. throw an exception on error.
-  * @return $this for method chaining. (throw exception on error)
-  */
-  public function save(){
-  	if($this->deleted)
-  		throw new Exception(get_class($this)."::save($this->PK) Can't save a deleted model");
-  	$needSave = $this->needSave;
-  	# exit if already in saving state
-  	if( $needSave < 0 )
-  		return $this;
-  	if( method_exists($this,'onBeforeSave') ){
-  		$PK = $this->PK;
+	/**
+	* save the Model to database. throw an exception on error.
+	* @return $this for method chaining. (throw exception on error)
+	*/
+	public function save(){
+		if($this->deleted)
+			throw new Exception(get_class($this)."::save($this->PK) Can't save a deleted model");
+		$needSave = $this->needSave;
+		# exit if already in saving state
+		if( $needSave < 0 )
+			return $this;
+		if( method_exists($this,'onBeforeSave') ){
+			$PK = $this->PK;
 			$res = $this->onBeforeSave();
 			if( $PK !== $this->PK)
 				self::_setInstanceKey($this,$PK);
-  		if( true === $res )
-  			return $this;
-  	}
-  	$this->needSave = -1;
-  	$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+			if( true === $res )
+				return $this;
+		}
+		$this->needSave = -1;
+		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
 
 		#- check related models that need to be save before
 		$waitForSave = array();
@@ -1133,7 +1155,7 @@ abstract class abstractModel{
 					break;
 			}
 		}
-  	foreach(self::_getModelStaticProp($this,'hasMany') as $relName=>$relDef){
+		foreach(self::_getModelStaticProp($this,'hasMany') as $relName=>$relDef){
 			if(! empty($relDef['linkTable']) ){ #- save object that use a link table at the very end
 				if( isset($this->_manyModels[$relName]) )
 					$linked[$relName] = $relDef;
@@ -1154,7 +1176,7 @@ abstract class abstractModel{
 			}
 		}
 
-  	if( $needSave > 0){
+		if( $needSave > 0){
 			$datas = $this->datas;
 			$PK = $this->PK;
 			$primaryKey = self::_getModelStaticProp($this,'primaryKey');
@@ -1200,8 +1222,8 @@ abstract class abstractModel{
 				$this->dbAdapter->optimize($relDef['linkTable']);
 		}
 
-    $this->needSave = 0;
-    return $this;
+		$this->needSave = 0;
+		return $this;
 	}
 
 	/**
@@ -1212,7 +1234,7 @@ abstract class abstractModel{
 	*/
 	public function delete(){
 		if($this->deleted)
-  		throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
+			throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
 		if($this->needSave < 0)
 			return $this;
 		$this->needSave = -1;
