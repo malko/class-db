@@ -8,7 +8,8 @@
 * @since 2006-04-16 first splitted version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2008-04-10 - new class dbprofiler
+* @changelog - 2008-04-14 - add location of queries and some colors to dbProfiler
+*            - 2008-04-10 - new class dbprofiler
 *            - 2008-04-06 - autoconnect is now a static property
 *                         - now db::getInstance call require on missing class-xxxxdb.php
 *            - 2008-02-19 - now get_count() method can receive optional clause as second parameter
@@ -34,7 +35,6 @@
 *            - 2006-12-05 - new method select_field_to_array()
 *            - 2006-05-15 - new methods set_slice_attrs() and select_array_slice() to easily paginate your results
 */
-
 class dbProfiler{
 	static public $precision     = 4;
 
@@ -44,7 +44,7 @@ class dbProfiler{
 
 	function __construct($dbInstance){
 		$this->db  = $dbInstance;
-		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','query','query_to_array'));
+		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','insert','query','query_to_array'));
 	}
 
 	function __get($k){
@@ -59,9 +59,16 @@ class dbProfiler{
 		if(! in_array($m,$this->statFuncs))
 			return call_user_func_array(array($this->db,$m),$a);
 		# - get stat on queries
-		$stat = array("<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',$this->get_microtime());
+		$trace = debug_backtrace();
+		$stat = array(
+			basename($trace[1]['file']).'('.$trace[1]['line'].')',
+			"<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',
+			$this->get_microtime()
+		);
 		$res  = call_user_func_array(array($this->db,$m),$a);
 		$stat[] = $this->get_microtime();
+		if( $res === false)
+			$stat[0] = '<span style="color:red;"'.$stat[0].'</span>';
 		self::$stats[] = $stat;
 		return $res;
 	}
@@ -75,15 +82,15 @@ class dbProfiler{
 			return;
 		$total = 0;
 		foreach(self::$stats as $stat){
-			list($query,$start,$end) = $stat;
+			list($locInfo,$query,$start,$end) = $stat;
 			$time = round($end-$start,self::$precision);
-			$rows[] = '<tr><td style="border-bottom:solid silver 1px;">'.$query.'</td><td style="border-bottom:solid silver 1px;text-align:right;">'.$time.' sec</td></tr>';
+			$rows[] = '<tr><td style="border-bottom:solid silver 1px;vertical-align:top;">'.$query.'</td><td style="border-bottom:solid silver 1px;vertical-align:top;"><i>'.$locInfo.'</i></td><td style="border-bottom:solid silver 1px;text-align:right;vertical-align:top;">'.$time.' sec</td></tr>';
 			$total += $time;
 		}
 		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;">
 		<caption style="text-align:left;font-weight:bold;" onclick="var body = document.getElementById(\'dbProfilerReport\');body.style.display=(body.style.display==\'none\'?\'table-row-group\':\'none\')">dbProfiler report</caption>
-		<thead><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
-		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
+		<thead><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
+		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
 		<tbody id="dbProfilerReport" style="display:none;">'.implode('',$rows)."</tbody>
 		</table>";
 	}
