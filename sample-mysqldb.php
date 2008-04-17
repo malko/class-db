@@ -3,17 +3,18 @@
 * sample script for class-mysqldb
 */
 
-require('class-mysqldb.php');
+require('class-db.php');
+# define the connection string
+define('DB_CONNECTIONSTRING','mysqldb://test;localhost;root;');
 
-$dbname = 'test';
-$dbhost = 'localhost';
-$dbuser = 'root';
-$dbpass = '';
+# get a single instance of the class from anywhere in your script
+$db = db::getInstance(DB_CONNECTIONSTRING);
 
-# instantiate database object with autoconnection
-$db = new mysqldb($dbname,$dbhost,$dbuser,$dbpass);
-# put on the devel mode
-$db->beverbose = true;
+# put on the devel mode (3 will print all queries and errors)
+$db->beverbose = 3;
+
+# if we want to mae some profiling we can decorate the db class with dbProfiler
+$db = new dbProfiler($db);
 
 # then create a test table
 $Qstr = "CREATE TABLE `test` (
@@ -35,7 +36,7 @@ if($db->insert('test',array('date'=>'2007-02-01','description'=>"insert without 
 else
   echo "Error while inserting\n";
 
-# we can get some info on the database and tables 
+# we can get some info on the database and tables
 echo "list tables in $dbname:\n";
 print_r($db->list_tables());
 
@@ -63,7 +64,7 @@ echo "select a single row as an array using smart params:\n";
 print_r($db->select_single_to_array('test','*', array("WHERE $fldDate = ?",'2007-01-02')));
 
 echo "select all rows as an array indexed by the date field (supposing they are unique):\n";
-print_r($db->select2associative_array('test','*',null,'date')); 
+print_r($db->select2associative_array('test','*',null,'date'));
 echo "<small>note about above, the date field doesn't need to be protect there as it's an array key not a field in the query</small>\n";
 
 echo "select all description indexed by ids:\n";
@@ -80,9 +81,9 @@ echo "update first row:\n";
 $db->update('test',array('date'=>'2007-02-02'),array("WHERE id = ?",$ids[1]));
 print_r($db->select_to_array('test'));
 
-# now delete some rows
-echo "delete some rows:\n";
-$db->delete('test',array("WHERE id < 2"));
+# now delete some rows using the smart question mark for condition string
+echo "delete some rows using smart question mark:\n";
+$db->delete('test',array("WHERE id < ?",2));
 print_r($db->select_to_array('test'));
 
 echo "now create some more tables:\n";
@@ -121,5 +122,7 @@ echo "ending the sample by cleaning up the database\n";
 # clean up the database:
 $db->query('DROP TABLE test,owners,owners_desc');
 
+# print out the profiler result (click on the title for detail)
+dbProfiler::printReport();
 ?>
 </pre>
