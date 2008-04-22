@@ -25,6 +25,7 @@
 *                         - new class modelCollection that permitt some nice tricks (thanks to SPL)
 * @changelog - 2008-03-15 - now can get and add related one2many objects
 *
+* @todo write something cool to use sliced methods (setSLice attrs in a better way with some default stuff for each models)
 * @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
 *       require php >= 5.3 features such as late static binding and __callstatic() magic method
 *       you will have to satisfy yourself with getFilteredInstances() method until that
@@ -61,7 +62,6 @@
 *   de facon a typer les variables mais aussi d'en verifier la longueure (<- pas forcement utile au pire c'est tronqué tant pis si les gens font n'importe quoi)
 *   ainsi proposé des validations par défaut sur les données et donc créer de nouveau type de données comme par exemple: email, url etc... qui sont des choses réccurentes
 *
-* @todo permettre de charger toutes les instances d'une collection en une seule requete (amelioration des performances)
 * @todo OPTIMISER LES DELETES!!!!!
 */
 
@@ -252,21 +252,22 @@ class modelCollection extends arrayObject{
 				$this[$v] = $modelLoaded;
 			}
 		}
-		if(empty($needLoad))
-			return $this;
-		# then load all datas at once
-		$db = abstractModel::getModelDbAdapter($this->collectionType);
-		$tb = abstractModel::_getModelStaticProp($this->collectionType,'tableName');
-		$primaryKey = abstractModel::_getModelStaticProp($this->collectionType,'primaryKey');
-		if($limit>0)
-			$needLoad = array_slice($needLoad,0,$limit);
-		$rows = $db->select_rows($tb,'*',array("WHERE $primaryKey IN (?)",$needLoad));
-		if( empty($rows) ) #- @todo musn't append so certainly have to throw an exception ??
-			return $this;
-		foreach($rows as $row){
-			$PK = $row[$primaryKey];
-			$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true);
+		if(! empty($needLoad) ){
+			# then load all datas at once
+			$db = abstractModel::getModelDbAdapter($this->collectionType);
+			$tb = abstractModel::_getModelStaticProp($this->collectionType,'tableName');
+			$primaryKey = abstractModel::_getModelStaticProp($this->collectionType,'primaryKey');
+			if($limit>0)
+				$needLoad = array_slice($needLoad,0,$limit);
+			$rows = $db->select_rows($tb,'*',array("WHERE $primaryKey IN (?)",$needLoad));
+			if( empty($rows) ) #- @todo musn't append so certainly have to throw an exception ??
+				return $this;
+			foreach($rows as $row){
+				$PK = $row[$primaryKey];
+				$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true);
+			}
 		}
+
 		if(null!==$withRelated){
 			$withRelated = explode('|',$withRelated);
 			foreach($withRelated as $key)
@@ -586,26 +587,6 @@ abstract class abstractModel{
 		return self::getMultipleModelInstances($modelName,empty($PKs)?array():$PKs);
 	}
 
-	/**
-	* return all instances of modelName in databases and load them all at once
-	* @param string $modelName
-	* @param string $withRelated string of related stuffs to load at the same time. multiple values are separated by |
-	* @return modelCollection indexed by their primaryKeys
-	*/
-	static public function getAllModelInstances($modelName,$withRelated=null){
-		$tableName  = self::_getModelStaticProp($modelName,'tableName');
-		$db = self::getModelDbAdapter($modelName);
-		$rows = $db->select_rows($tableName);
-		$collection = new modelCollection($modelName);
-		if( $rows ===false )
-			return $collection;
-		foreach($rows as $row)
-			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
-		if( null !== $withRelated )
-			$collection->loadDatas($withRelated);
-		return $collection;
-	}
-
 	/*
 	* return modelCollection of modelName where primaryKeys are returned by the SQL query.
 	* the SQL query should return only the primaryKeys values.
@@ -614,7 +595,6 @@ abstract class abstractModel{
 	}//*/
 
 	static public function getFilteredModelInstancesByField($modelName,$field,$filterType,$args=null){
-		show(func_get_args());
 		static $filterTypes;
 		if(! isset($filterTypes) ){
 			$filterTypes = array(
@@ -651,6 +631,62 @@ abstract class abstractModel{
 		return abstractModel::getFilteredModelInstances($modelName,$args);
 	}
 
+	/**
+	* return all instances of modelName in databases and load them all at once
+	* @param string $modelName
+	* @param string $withRelated string of related stuffs to load at the same time. multiple values are separated by |
+	* @param string $orderedBY   an SQL ORDER BY clause, no order by default
+	* @return modelCollection indexed by their primaryKeys
+	*/
+	static public function getAllModelInstances($modelName,$withRelated=null,$orderedBY=null){
+		$tableName  = self::_getModelStaticProp($modelName,'tableName');
+		$db = self::getModelDbAdapter($modelName);
+		$rows = $db->select_rows($tableName,'*',$orderedBY);
+		$collection = new modelCollection($modelName);
+		if( $rows ===false )
+			return $collection;
+		foreach($rows as $row)
+			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
+		if( null !== $withRelated )
+			$collection->loadDatas($withRelated);
+		return $collection;
+	}
+
+	/**
+	* same as getFilteredModelInstaces but return only a slice from the results.
+	* It's typically use to create paginated results set when displaying big list of items.
+	* the navigation str can be set using abstractModel::_setPagedNav()
+	* @param string $modelName
+	* @param array  $filter    same as conds in class-db methods
+	* @param int    $pageId    the page to return (start at 1)
+	* @param int    $pageSize  max number of results by page.
+	* @return array(modelCollection,navigationstring,totalrows);
+	*/
+	static public function getPagedModelInstances($modelName,$filter=null,$pageId=1,$pageSize=10,$withRelated=null){
+		$tableName  = self::_getModelStaticProp($modelName,'tableName');
+		$db = self::getModelDbAdapter($modelName);
+		$rows = $db->select_slice($tableName,'*',$filter,$pageId,$pageSize);
+		$collection = new modelCollection($modelName);
+		if( $rows === false )
+			return array($collection,'',0);
+		list($rows,$nav,$total) = $rows;
+		foreach($rows as $row)
+			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
+		if( null !== $withRelated )
+			$collection->loadDatas($withRelated);
+		return array($collection,$nav,$total);
+	}
+	/**
+	* set page navigation string for the given model.
+	* in fact just a wrapper to model::dbAdapter->set_slice_attrs
+	* @see db::set_slice_attrs for more info
+	* @return array() sliceAttrs (full attrs)
+	*/
+	static public function _setModelPagedNav($modelName,$sliceAttrs=null){
+		$db = self::getModelDbAdapter($modelName);
+		return $db->set_slice_attrs($sliceAttrs);
+	}
+	
 	/**
 	* check if there is any living (already loaded) instance of the given model for matching PK
 	* @param string $modelName   model name

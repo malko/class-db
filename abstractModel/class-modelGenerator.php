@@ -335,21 +335,28 @@ class modelGenerator{
 	static public function getInstance(\$PK=null){
 		return abstractModel::getModelInstance('$modelName',\$PK);
 	}
-
 	static public function getMultipleInstances(array \$PKs){
 		return abstractModel::getMultipleModelInstances('$modelName',\$PKs);
 	}
-
-  static public function getFilteredInstances(\$filter=null){
+	static public function getFilteredInstances(\$filter=null){
 		return abstractModel::getFilteredModelInstances('$modelName',\$filter);
 	}
-
 	static public function getFilteredInstancesByField(\$field,\$filterType,\$args=null){
 		return abstractModel::getFilteredModelInstancesByField('$modelName',\$field,\$filterType,\$args);
 	}
 	static public function getInstanceFromDatas(\$datas,\$dontOverideIfExists=false,\$bypassFilters=false){
 		return abstractModel::getModelInstanceFromDatas('$modelName',\$datas,\$dontOverideIfExists,\$bypassFilters);
 	}
+	static public function getAllInstances(\$withRelated=null,\$orderedBY=null){
+		return abstractModel::getAllModelInstances('$modelName',\$withRelated,\$orderedBY);
+	}
+	static public function getPagedInstances(\$filter=null,\$pageId=1,\$pageSize=10,\$withRelated=null){
+		return abstractModel::getPagedModelInstances('$modelName',\$filter,\$pageId,\$pageSize,\$withRelated);
+	}
+	static public function _setPagedNav(\$sliceAttrs){
+		return abstractModel::_setModelPagedNav('$modelName',\$sliceAttrs);
+	}
+
 	static public function getCount(\$filter=null){
 		return abstractModel::getModelCount('$modelName',\$filter);
 	}
