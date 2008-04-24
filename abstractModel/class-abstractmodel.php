@@ -5,59 +5,34 @@
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @licence LGPL
 * @since 2007-10
-* @changelog - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
+* @changelog - 2008-04-25 - new  sort and rsort methods for modelCollection.
+*            - 2008-04-xx - so many changes that i didn't mentioned them as we weren't in any "stable" or even "alpha" release
+*                           now that we have a more usable version i will write changes again
+*            - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
 *                         - methods append_relName || appendRelName to add related object to hasMany relations
 *                         - methods set_relName_collection || setRelNameCollection to set an entire modelCollection as a hasMany relation
 *                         - method save on modelCollection
 *                         - don't load unsetted related object at save time
-* @changelog - 2008-03-30 - separation of modelGenerator class in its own file
+*            - 2008-03-30 - separation of modelGenerator class in its own file
 *                         - remove the withRel parameter everywhere (will be replaced with dynamic loading everywhere)
 *                         - replace old relational defs (one2*) by hasOne and hasMany defs instead
-* @changelog - 2008-03-25 - some change in modelCollection and apparition of modelCollectionIterator.
+*            - 2008-03-25 - some change in modelCollection and apparition of modelCollectionIterator.
 *                           now models can be setted with only their PK and be retrieved only on demand (dynamic loading)
-* @changelog - 2008-03-24 - now you can have user define methods for setting and filtering datas
+*            - 2008-03-24 - now you can have user define methods for setting and filtering datas
 *                         - new methods filterDatas, appendFiltersMsgs and hasFiltersMsgs (to ease the creation of user define filter methods)
 *                         - getFiltersMsgs can now take a parameter to reset messages
-* @changelog - 2008-03-23 - better model generation :
+*            - 2008-03-23 - better model generation :
 *                           * support autoMapping
 *                           * can overwrite / append / or skip existing models
 *                           * can set a constant as dbConnectionStr
 *                         - new class modelCollection that permitt some nice tricks (thanks to SPL)
-* @changelog - 2008-03-15 - now can get and add related one2many objects
+*            - 2008-03-15 - now can get and add related one2many objects
 *
 * @todo write something cool to use sliced methods (setSLice attrs in a better way with some default stuff for each models)
 * @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
 *       require php >= 5.3 features such as late static binding and __callstatic() magic method
 *       you will have to satisfy yourself with getFilteredInstances() method until that
-*
-* @todo implement pagination
-*
-* @todo remove the $withRel parameter everywhere and permit dynamic load instead (thanks to modelCollection that help on this)
-*
-* @todo redefine relations with more appropriate terminology and logic such as:
-*       -  hasOne  => array( 'model'=>modelName, 'localField'=>localField, dependancyType )
-*       -  hasMany => array( 'model'=>modelName, 'localField'=>localField, 'modelField' => modelField ,dependancyType )
-*       -  hasMany => array( 'model'=>modelName, 'thisRelField'=>fieldThatRefThisPK, 'linkTable' => linkTable, 'relRelField'=> fieldThatRefRelmodelPK ,dependancyType )
-*       dependancyTypes can be something like require, requiredBy, ignore and can permit to handle properly cascade saving and more important onDelete actions
-*       onDelete can be extend and call the parent::onDelete methods as required
-*
-* @todo gerer les sauvegardes en cascades des relations one2many
-* dans le cas du one2one on referencie une clef etrangere donc:(ex un/des livre(s) a/ont un auteur)
-* - l'objet one2one requiert la reference et donc doit sauver la reference avant sa propre sauvegarde
-* 	EN FAIT ON DEVRAIT POUVOIR PRÉCISER SI l'OBJET EST REQUIS OU NON (sort of belongTo)
-*
-* dans le cas d'une relation one2many on referencie des objets qui possendent une clef etrangere sur l'objet (un auteur a plusieurs livres)
-* - l'objet ne depend pas des objets qui ont une référence sur lui
-* - l'objet doit etre sauvé avant de pouvoir sauver les objets qui en dépendent
-* - l'objet doit savoir comment faire réagir les objets qui en dépendent lorsqu'il est supprimé
-*   (delete all, avoid own deletion while dependent objects exists, set a flag to indicate that it's not available anymore, ignore)
-* - serait interressant de pouvoir limiter le nombre de many d'une facon ou d'une autre, à réflechir.
-*
-* dans le cas des relations many2many on passe par une table de transition qui referencie d'autres objets (exemples les livres appartiennent ont plusieurs tags/categories)
-* 2 cas sont envisageables -> les objets sont interdependants ou au contraire sont indépendant les uns des autres
-* là c'est un cas qui merite encore reflexion, géront déjà le reste propel ne sait pas encore gérer ca nous nous y arriverons c'est un but important
-*
-* @todo typer les données et leur longueur
+* @todo typer les données et leur longueur (partially done)
 * - il serait interressant que les classes filles aient connaissance des informations de type et de longueur des champs
 *   de facon a typer les variables mais aussi d'en verifier la longueure (<- pas forcement utile au pire c'est tronqué tant pis si les gens font n'importe quoi)
 *   ainsi proposé des validations par défaut sur les données et donc créer de nouveau type de données comme par exemple: email, url etc... qui sont des choses réccurentes
@@ -87,6 +62,10 @@ class modelCollectionIterator extends arrayIterator{
 */
 class modelCollection extends arrayObject{
 	protected $collectionType = 'abstractModel';
+	/** internal properties used at sort time */	
+	private $_sortBy       = null;
+	private $_sortType     = null;
+	private $_sortReversed = false;
 
 	function __construct($collectionType=null,array $modelList=null){
 		if(empty($modelList))
@@ -334,6 +313,77 @@ class modelCollection extends arrayObject{
 		unset($this[$PK]);
 
 		return $this;
+	}
+	/**
+	* sort collection by given datas property name
+	* @param str $sortBy   property to use to sort the collection
+	*                      - null (default) will use std, natc or binc depending on property type (as defined in model::datasDefs[property])
+	*                      - std  use standard > or < comparison
+	*                      - nat  use natural order comparison case sensitive (strnatcmp)
+	*                      - natc use natural order comparison case insensitive (strnatcasecmp)
+	*                      - bin  use binary string comparison case sensitive(strcmp)
+	*                      - binc use binary string comparison case insensitive (strcasecmp)
+	*                      - user defined callback function (any callable comparison function (see php::usort() for more info)
+	* @return $this for method chaining
+	*/
+	function sort($sortBy,$sortType=null){
+		$this->_sortBy   = $sortBy;
+		$propDef = abstractModel::_getModelStaticProp($this->collectionType,'datasDefs');
+		if( empty($propDef[$sortBy]) )
+			throw new Exception('Try to sort an unsortable property');
+		#- setting sorttype
+		if( is_null($sortType) ){ #- choose a default sortType according to datas type
+			$propDef = $propDef[$sortBy];
+			if( preg_match('!int|timestamp|float|real|double|date|bool!i',$propDef['Type']) )
+				$sortType = 'std';
+			elseif( false !== stripos($propDef['Type'],'bin') )
+				$sortType = 'binc';
+			else
+				$sortType = 'natc';
+		}elseif( (! in_array($sortType,array('std','nat','natc','bin','binc'),true)) && ! is_callable($sortType)){
+			throw new Exception('modelCollection::sort() call with invalid sortType parameter');
+		}
+		$this->_sortType = $sortType;
+		#- ensure datas are loaded to avoid multiple on demand loading
+		$this->loadDatas();
+		uasort($this,array($this,'sortCompare'));
+		return $this;
+	}
+	/**
+	* same as sort but in reverse order
+	* @see modelCollection::sort()
+	* @param str $sortBy   property to use to sort the collection
+	* @param str $sortType type of comparison to use can be one of see modelCollection::sort() method for more info
+	* @return $this for method chaining
+	*/
+	function rsort($sortBy,$sortType=null){
+		$this->_sortReversed = true;
+		$this->sort($sortBy,$sortType);
+		$this->_sortReversed = false;
+		return $this;
+	}
+	/**
+	* internal method to sort collection
+	* @private
+	* @see modelCollection::sort(), modelCollection::rsort()
+	*/
+	private function sortCompare($a,$b){
+		$a = $a->{$this->_sortBy};
+		$b = $b->{$this->_sortBy};
+		if($a == $b)
+			return 0;
+		switch($this->_sortType){
+			case 'nat':  $res = strnatcmp($a,$b); break;
+			case 'natc': $res = strnatcasecmp($a,$b); break;
+			case 'bin':  $res = strcmp($a,$b); break;
+			case 'binc': $res = strcasecmp($a,$b); break;
+			case 'std':  $res = ($a < $b)?-1:1; break;
+			default:
+				$res = call_user_func($this->_sortType,$a,$b);
+		}
+		if( $this->_sortReversed)
+			return $res>0?-1:1;
+		return $res;
 	}
 }
 
