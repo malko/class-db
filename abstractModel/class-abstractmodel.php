@@ -468,7 +468,7 @@ abstract class abstractModel{
 	/**
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
 	*/
-	static public $useDbProfiler = true;
+	static public $useDbProfiler = false;
 
 	/**
 	* only for debug purpose
@@ -516,7 +516,8 @@ abstract class abstractModel{
 				.((count($oneKeys)&&count($manyKeys))?'|':'')
 				.self::$_internals[get_class($this)]['hasManyKeyExp'];
 			#- prepare datas keys exp
-			foreach(array_keys($this->datas) as $k)
+			$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+			foreach(array_keys($datasDefs) as $k)
 				$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
 			self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
 		}
