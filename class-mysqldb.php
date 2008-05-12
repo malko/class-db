@@ -2,11 +2,14 @@
 /**
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2003-2008  Jonathan Gotti
-* @package DB
+* @package class-db
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @subpackage MYSQL
 * @since 2004-11-26 first splitted version
-* @changelog - 2008-04-06 - autoconnect is now a static property
+* @changelog - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
+*                           $setNamesOnSelectDb if both are null then nothing will happen else it will perform
+*                           a SET NAMES query on the selected database.
+*            - 2008-04-06 - autoconnect is now a static property
 *            - 2008-03-20 - new static parameter (bool) $useNewLink used as mysql_connect new_link parameter
 *                           (really usefull when working on different databases on the same host.
 *                           you'd better set this to false as default if you don't need that feature.)
@@ -25,6 +28,11 @@ class mysqldb extends db{
 	* @see mysql_connect for more info
 	*/
 	static public $useNewLink = false;
+	/**
+	* used to perform a query "SET NAMES '$dfltEncoding'" when select a database on the server
+	* leave null if you don't want this to be done
+	*/
+	static public $setNamesOnSelectDb='UTF8';
 
 	function __construct($dbname,$dbhost='localhost',$dbuser='root',$dbpass=''){ # most common config ?
 		$this->host   = $dbhost;
@@ -48,9 +56,12 @@ class mysqldb extends db{
 	/**
 	* Select the database to work on (it's the same as the use db command or mysql_select_db function)
 	* @param string $dbname
+	* @param string $setNames permit to enforce encoding connection to the given character set
+	*                         if null will default to self::$setNamesOnSelectDb.
+	*                         if both are null then no SET NAMES will be performed
 	* @return bool
 	*/
-	function select_db($dbname=null){
+	function select_db($dbname=null,$setNames=null){
 		if(! ($dbname || $this->dbname) )
 			return FALSE;
 		if($dbname)
@@ -60,6 +71,10 @@ class mysqldb extends db{
 			$this->set_error(__FUNCTION__);
 			return FALSE;
 		}else{
+			if( null=== $setNames && null !== mysqldb::$setNamesOnSelectDb )
+				$setNames = mysqldb::$setNamesOnSelectDb;
+			if( null!== $setNames)
+				$this->query("SET NAMES '$setNames'");
 			return $this->db;
 		}
 	}

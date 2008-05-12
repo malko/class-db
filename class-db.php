@@ -3,7 +3,7 @@
 * Base class for databases object.
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2003-2008  Jonathan Gotti
-* @package DB
+* @package class-db
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2006-04-16 first splitted version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
