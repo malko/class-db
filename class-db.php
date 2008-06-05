@@ -461,19 +461,21 @@ class db{
 				$slideEnd   = min($nbpages,$pageId + $delta + ($pageId > $delta?0: $delta - $pageId + 1 ) );
 			}
 			for($i=$slideStart;$i<=$slideEnd;$i++){
-				$pageLinks[] = str_replace( array('%lnk','%page'),
-																		array(str_replace('%page',$i,$linkStr),$i),
-																		($i==$pageId?$curpage:$pages)
-																	);
+				$pageLinks[] = str_replace(
+					array('%lnk','%page'),
+					array(str_replace('%page',$i,$linkStr),$i),
+					($i==$pageId?$curpage:$pages)
+				);
 			}
 
 			$links = implode($linkSep,$pageLinks);
 		}
 
-		$formatStr = str_replace( array('%first','%prev','%next','%last','%'.$nblinks.'links','%tot','%nbpages','%page'),
-															array($first,$prev,$next,$last,$links,$tot,$nbpages,$pageId),
-															$formatStr
-														);
+		$formatStr = str_replace(
+			array('%first','%prev','%next','%last','%'.$nblinks.'links','%tot','%nbpages','%page'),
+			array($first,$prev,$next,$last,$links,$tot,$nbpages,$pageId),
+			$formatStr
+		);
 		return array($res,$formatStr,$tot);
 	}
 
@@ -501,17 +503,18 @@ class db{
 	public function set_slice_attrs($attrs=null){
 		static $sliceAttrs;
 		if(! isset($sliceAttrs) ){
-			$sliceAttrs = array( 'first' => "<a href=\"%lnk\" class=\"pagelnk\"><<</a>",
-														'prev'  => "<a href=\"%lnk\" class=\"pagelnk\"><</a>",
-														'next'  => "<a href=\"%lnk\" class=\"pagelnk\">></a>",
-														'last'   => "<a href=\"%lnk\" class=\"pagelnk\">>></a>",
-														'pages'  => "<a href=\"%lnk\" class=\"pagelnk\">%page</a>",
-														#- 'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
-														'curpage'  => '<input type="text" value="%page" onfocus="this.value=\'\';" onkeydown="if(event.keyCode==13){ var p=parseInt(this.value)||1;window.location=\'%lnk\'.replace(/page=%page/,\'page=\'+(p>%nbpages?%nbpages:(p<1?1:p)));return false;}" size="3" title="aller &agrave; la page" style="text-align:center;" />',
-														'linkStr'  => "?page=%page",
-														'linkSep'  => " ",
-														'formatStr'=> " %first %prev %5links %next %last"
-													);
+			$sliceAttrs = array(
+				'first' => "<a href=\"%lnk\" class=\"pagelnk\"><<</a>",
+				'prev'  => "<a href=\"%lnk\" class=\"pagelnk\"><</a>",
+				'next'  => "<a href=\"%lnk\" class=\"pagelnk\">></a>",
+				'last'   => "<a href=\"%lnk\" class=\"pagelnk\">>></a>",
+				'pages'  => "<a href=\"%lnk\" class=\"pagelnk\">%page</a>",
+				#- 'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
+				'curpage'  => '<input type="text" value="%page" onfocus="this.value=\'\';" onkeydown="if(event.keyCode==13){ var p=parseInt(this.value)||1;window.location=\'%lnk\'.replace(/page=%page/,\'page=\'+(p>%nbpages?%nbpages:(p<1?1:p)));return false;}" size="3" title="aller &agrave; la page" style="text-align:center;" />',
+				'linkStr'  => "?page=%page",
+				'linkSep'  => " ",
+				'formatStr'=> " %first %prev %5links %next %last"
+			);
 		}
 		if( is_array($attrs) ){
 			foreach($sliceAttrs as $k=>$v){
