@@ -295,7 +295,7 @@ class mysqldb extends db{
 			fwrite($fout,$entete);
 		$tables = $this->list_tables();
 		foreach($tables as $table){
-			$table_create = $this->query_to_array("SHOW CREATE TABLE $table",MYSQL_NUM);
+      $table_create = $this->query_to_array("SHOW CREATE TABLE $table",'NUM');
 			$table_create = $table_create[0]; # now we have the create statement
 			$create_str = "\n\n#\n# Table Structure `$table`\n#\n\n".($droptables?"DROP TABLE IF EXISTS $table;\n":'').$table_create[1].";\n";
 			if($gziped)
@@ -315,10 +315,10 @@ class mysqldb extends db{
 					foreach($row as $field=>$value){
 						if($i==0){ # on the first line we get fields
 							$fields[] = "`$field`";
-							if( mysql_field_type($this->last_qres,$z++) == 'string') # will permit to correctly protect number in string fields
+              if( mysql_field_type($this->last_qres,$z++) === 'string') # will permit to correctly protect number in string fields
 								$stringsfields[$field]  = TRUE;
 						}
-						if(preg_match("!^-?\d+(\.\d+)?$!",$value) && !$stringsfields[$field])
+            if(preg_match("!^-?\d+(\.\d+)?$!",$value) && empty($stringsfields[$field]) )
 							$value = $value;
 						elseif($value==null)
 							$value =  $stringsfields[$field]?"''":"NULL";
@@ -326,7 +326,7 @@ class mysqldb extends db{
 							$value = "'".$this->escape_string($value,"single")."'";
 						$values[] = $value;
 					}
-					$insert_str = ($i==0?"INSERT INTO `$table` (".implode(',',$fields).")\n       VALUES ":",\n")."(".implode(',',$values).')';
+          $insert_str = ($i==0?"INSERT INTO `$table` (".implode(',',$fields).")\n\tVALUES ":",\n\t")."(".implode(',',$values).')';
 					if($gziped)
 						gzwrite($fout,$insert_str);
 					else
