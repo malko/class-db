@@ -4,6 +4,7 @@
 * Sqlite Admin tool
 * @changelog - 2008-03-20 - add the rehash command to refresh completion table
 *                         - add maxcolsize and maxcolwidth command
+*                         - bug correction that offer page navigation on agregation query (ie: select count(*) from...)
 *            - 2008-03-19 - new possibility to call some callBack on tables to clean datas
 *                         - add some methods to help using mbstring on entire tables
 *                         - add support for use database command (only for mysqldb for now at least)
@@ -19,11 +20,12 @@
 *                         - if no HISTSIZE value is found in $_SERVER then default to console_app::$historyMaxLen
 *            - 2007-07-17 - now can export a query to a csv file
 *            - 2007-04-19 - start php5 port
+* @todo add a config file support
 */
 error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
-require('../console_app/class-console_app.php');
+require('../../console_app/trunk/class-console_app.php');
 require('class-db.php');
 
 #setting apps params and desc
@@ -285,9 +287,9 @@ while(TRUE){
       break;
     case 'select':
       $Q_str = check_query($read);
-      $clauseExp = '(?:\s+((where\s+|group\s+by\s+|order by\s+|having\s+|procedure\s+|limit\s+|for\s+update\s+|lock\s+in\s+share\s+))?\s*)';
-      if(! preg_match('!^\s*select\s+(.*?)\s+from\s+(.*?);?$!si',$Q_str,$m)){
-        console_app::dbg($m);
+      $clauseExp = '(?:\s+((where\s+|group\s+by\s+|order by\s+|having\s+|procedure\s+|limit\s+|for\s+update\s+|lock\s+in\s+share\s+).*?)?\s*)?';
+      if(! preg_match('!^\s*select\s+(.*?)\s+from\s+(.*?)'.$clauseExp.';\s*$!si',$Q_str,$m)){
+        #- ~ console_app::dbg($m);
         if(! $res = $db->query_to_array($Q_str))
           console_app::msg("No Result!");
         else
@@ -436,6 +438,52 @@ mb_setconvert  charset            set output encoding for mb_convert_encoding
 ";
 }
 
+/** remove accented chars (iso-8859-1 and UTF8) */
+function removeMoreAccents($str){
+	static $convTable;
+	# create conversion table on first call
+	if(! isset($convTable) ){
+		$tmpTable = array(
+			'µ'=>'u',
+			'À'=>'A', 'Á'=>'A', 'Â'=>'A', 'Ã'=>'A', 'Ä'=>'A', 'Å'=>'A', 'Æ'=>'AE',
+			'Ç'=>'C', 'È'=>'E', 'É'=>'E', 'Ê'=>'E', 'Ë'=>'E',
+			'Ì'=>'I', 'Í'=>'I', 'Î'=>'I', 'Ï'=>'I', 'Ð'=>'D', 'Ñ'=>'N',
+			'Ò'=>'O', 'Œ'=>'OE', 'Ó'=>'O', 'Ô'=>'O', 'Õ'=>'O', 'Ö'=>'O', 'Ø'=>'O',
+			'Ù'=>'U', 'Ú'=>'U', 'Û'=>'U', 'Ü'=>'U', 'Ý'=>'Y', 'ß'=>'s',
+			'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'ae',
+			'ç'=>'c', 'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e',
+			'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i', 'ñ'=>'n',
+			'ð'=>'o', 'œ'=>'oe', 'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o',
+			'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ü'=>'u', 'ý'=>'y', 'ÿ'=>'y',
+			'’'=>'\'','`'=>'\'',
+		);
+		$keys  = array_keys($tmpTable);
+		$values= array_values($tmpTable);
+		# check internal encoding
+		if(ord('µ')===194){ # we are already in utf 8
+			$utf8keys = $keys;
+			$keys     = array_map('utf8_decode',$keys);
+			$utf8x2keys = array_map('utf8_encode',$utf8keys);
+		}else{
+			$utf8keys = array_map('utf8_encode',$keys);
+			$utf8x2keys = array_map('utf8_encode',$utf8keys);
+		}
+		if(function_exists('array_combine')){
+			$convTable = array_merge(array_combine($utf8x2keys,$values),array_combine($utf8keys,$values),array_combine($keys,$values));
+		}else{
+			foreach($utf8keys as $n=>$k){
+				$convTable[$utf8x2keys[$k]] = $convTable[$k] = $convTable[$keys[$n]] = $values[$n];
+			}
+		}
+	}
+	if(is_array($str)){
+		foreach($str as $k=>$v)
+			$str[$k] = strtr($v,$convTable);
+		return $str;
+	}
+	return strtr($str,$convTable);
+}
+
 function detectConvert($str){
 	global $mbStringAvailable,$mbStringDetectorder,$mbStringDetectStrict,$mbStringConvertTo;
 	return mb_convert_encoding($str,$mbStringConvertTo,mb_detect_encoding($str,$mbStringDetectorder, $mbStringDetectStrict));
@@ -486,6 +534,7 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
   global $pageSize,$db,$maxColSize;
   if(! isset($pageSize) )$pageSize = 10;
   $res = $db->select_array_slice($table,$fields,$conds,$pageId,$pageSize);
+
   if(! $res )
     return console_app::msg("No Result!");
 
@@ -497,7 +546,8 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
 	}
   console_app::print_table($results);
 
-  if($total <= $pageSize) # no navigation on unique page
+	# no navigation on unique page
+  if($total <= $pageSize || ($pageId===1 && count($results) < $pageSize) )
   	return;
 
   # affiche la navigation
@@ -562,6 +612,7 @@ function csv2array($csvfile,$fldnames=null,$sep=';',$filters=null){
   }
   $i=0;
   foreach($csv as $row){
+  	$row = preg_replace('!(\\\\r)?\\\\n!',"\n",$row);
     $row = explode($sep,trim($row));
     foreach($row as $fldnb=>$fldval)
       $res[$i][(isset($fldnames[$fldnb])?$fldnames[$fldnb]:$fldnb)] = $fldval;
