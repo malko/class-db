@@ -1,11 +1,32 @@
 <?php
 /**
-* @package DB
-* @subpackage model
+* @package class-db
+* @subpackage abstractModel
 * @author Jonathan Gotti <jgotti at jgotti dot org>
-* @licence LGPL
+* @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
-* @changelog - 2008-04-25 - new  sort and rsort methods for modelCollection.
+* @changelog - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
+*                         - setting related hasOne model by primaryKey will now set the correct type in the model datas array
+*            - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
+*                         - add remove method to modelCollection
+*            - 2008-05-08 - add abstractModel static public property $dfltFiltersDictionary to permit filterMsgs to be lookedUp in dictionaries (specific to simpleMVC)
+*                         - add sprintf support to appendFilterMsg() method
+*            - 2008-05-06 - now modelCollection::loadDatas() reset tmpAbstracModel keys
+*                         - modelCollection now implement method to create htmlOptions from models handles in it
+*                         - abstractModels can now access some static properties (primaryKey,tableName,modelName) as normal instance properties
+*            - 2008-05-05 - rewrite modelCollection::current() and add prev(), next(), first() and last() methods
+*                           all returning abtractModel or null
+*                         - add new methods support to modelCollection:
+*                           - increment/decrement methods (in|de)crementPropertyName($step=1)
+*                           - filtering method filterBy($propertyName,$exp,$comparisonOperator)
+*                           - mapping method map($callBack,$propertyName=null)
+*                           - cloning method clonedCollection()
+*                         - add $leaveNeedSaveState to permit to set instances by datas wihtout setting $needSave to 1
+*            - 2008-05-04 - add $isDummyInstance internal parameter to abstractModel::__construct
+*            - 2008-05-02 - some more methods to set datasTypes now addons can load modelInstance datas.
+*            - 2008-04-30 - now _makeModelStaticCall and getModelDbAdapter can take instance of model as first parameter instead of string
+*                         - add support for modelAddons
+*            - 2008-04-25 - new  sort and rsort methods for modelCollection.
 *            - 2008-04-xx - so many changes that i didn't mentioned them as we weren't in any "stable" or even "alpha" release
 *                           now that we have a more usable version i will write changes again
 *            - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
@@ -27,21 +48,40 @@
 *                           * can set a constant as dbConnectionStr
 *                         - new class modelCollection that permitt some nice tricks (thanks to SPL)
 *            - 2008-03-15 - now can get and add related one2many objects
-*
+* @todo replace all getModel/setModel methods by modelGet/modelSet to avoid collision with dynamicly defined get/set methods
 * @todo write something cool to use sliced methods (setSLice attrs in a better way with some default stuff for each models)
 * @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
 *       require php >= 5.3 features such as late static binding and __callstatic() magic method
-*       you will have to satisfy yourself with getFilteredInstances() method until that
+*       you will have to satisfy yourself with getFilteredInstances() or getFilteredInstancesByField() methods until that
 * @todo typer les données et leur longueur (partially done)
 * - il serait interressant que les classes filles aient connaissance des informations de type et de longueur des champs
 *   de facon a typer les variables mais aussi d'en verifier la longueure (<- pas forcement utile au pire c'est tronqué tant pis si les gens font n'importe quoi)
 *   ainsi proposé des validations par défaut sur les données et donc créer de nouveau type de données comme par exemple: email, url etc... qui sont des choses réccurentes
 *
-* @todo OPTIMISER LES DELETES!!!!!
+* @todo OPTIMISER LES DELETES (notamment sur les collections)!!!!!
+* @todo penser a setter les relations quand on fait un setModelCollection!!!!!
+*       et aussi au moment du save ca serait pas mal!
 */
 
 require_once(dirname(__file__).'/class-db.php');
 
+abstract class modelAddon{
+	protected $modelInstance = null;
+	protected $modelName     = null;
+	protected $dbAdapter     = null;
+	/**
+	* create an instance of modelAddon, it receive the modelInstance before any datas settings
+	* so it also receive the requested instance primaryKey.
+	* if constructor set the primaryKey value of the modelInstance then the model constructor
+	* won't try to set any more datas.
+	*/
+	public function __construct(abstractModel $modelInstance,$instancePK=null){
+		$this->modelInstance = $modelInstance;
+		$this->modelName     = abstractModel::_getModelStaticProp($this->modelInstance,'modelName');
+		$this->dbAdapter     = $this->modelInstance->dbAdapter;
+	}
+
+}
 
 class modelCollectionIterator extends arrayIterator{
 	public $modelCollection=null;
@@ -62,27 +102,87 @@ class modelCollectionIterator extends arrayIterator{
 */
 class modelCollection extends arrayObject{
 	protected $collectionType = 'abstractModel';
-	/** internal properties used at sort time */	
+	/** internal properties used at sort time */
 	private $_sortBy       = null;
 	private $_sortType     = null;
 	private $_sortReversed = false;
+	private $_datasKeyExp  = '';
 
 	function __construct($collectionType=null,array $modelList=null){
 		if(empty($modelList))
 			$modelList = array();
-		parent::__construct($modelList,0,'modelCollectionIterator');
-		if(! is_null($collectionType) )
+		# ensure primaryKey consistency
+		$list = array();
+		foreach($modelList as $v){
+			if($v instanceof $this->collectionType)
+				$list[$v->PK] = $v;
+			else
+				$list[$v] = $v;
+		}
+		parent::__construct($list,0,'modelCollectionIterator');
+		#- ~ parent::__construct($modelList,0,'modelCollectionIterator');
+		if(! is_null($collectionType) ){
 			$this->collectionType = $collectionType;
+			$modelInternals = abstractModel::_getModelStaticProp('abstractModel','_internals');
+			if( isset($modelInternals[$this->collectionType]) ){
+				$this->_datasKeyExp = $modelInternals[$this->collectionType]['datasKeyExp'];
+			}else{
+				#- prepare datas keys exp
+				foreach(array_keys(abstractModel::_getModelStaticProp($this->collectionType,'datasDefs')) as $k)
+					$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
+				$this->_datasKeyExp = implode('|',$datasKeys);
+			}
+		}
 	}
 	function getIterator(){
 		return new modelCollectionIterator($this);
 	}
+
 	function append($value){
 		if(! $value instanceof $this->collectionType)
 			throw new Exception("modelCollection::$this->collectionType can only append $this->collectionType models");
 		$index=$value->PK;
 		return $this->offsetSet($index, $value);
 	}
+	/**
+	* create a new abstractModel matching $this->collectionType and append it to the collection
+	* @return abstractModel
+	*/
+	function appendNew(){
+		$m = abstractModel::getModelInstance($this->collectionType);
+		$this->append($m);
+		return $m;
+	}
+
+	/**
+	* remove a model from collection (not a delete)
+	* @param mixed $model the model instance to remove or its PK
+	*                     or a list of model instance/PK to remove
+	* @return bool false if any of the given model wasn't part of the collection
+	*/
+	function remove($model){
+		if(! count($this))
+			return false;
+		if( is_null($model) )
+			$model = $this->PK;
+
+		if(is_array($model)){
+			$ret = true;
+			foreach($model as $m)
+				$ret &= $this->remove($m);
+			return $ret;
+		}
+
+		if( $model instanceof $this->collectionType )
+			$model = $model->PK;
+
+		if(! isset($this[$model]) )
+			return false;
+
+		unset($this[$model]);
+		return true;
+	}
+
 	function offsetSet($index,$value){
 		if(! $value instanceof $this->collectionType ){
 			if($index===null) #- @todo check that value can be a primaryKey for this type of instance
@@ -189,6 +289,7 @@ class modelCollection extends arrayObject{
 	* set all models in collection property at once
 	*/
 	function __set($k,$v){
+
 		$this->loadDatas();
 		foreach($this as $mk=>$m){
 			if( isset($m->$k) )
@@ -200,9 +301,29 @@ class modelCollection extends arrayObject{
 	* @return mixed
 	* @todo must have a reflection on what to accept or not and (what to return and when)
 	*/
-	#- ~ function __call($m,$a){
-		#- ~
-	#- ~ }
+	function __call($m,$a){
+		# increments / decrements
+		if( preg_match("!^(de|in)crement_?($this->_datasKeyExp)$!",$m,$match) ){
+			$this->loadDatas();
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[2]);
+			if($match[1]==='de')
+				return $this->decrement($dataKey,empty($a[0])?1:$a[0]);
+			else
+				return $this->increment($dataKey,empty($a[0])?1:$a[0]);
+		}
+	}
+
+  ###--- INCREMENT / DECREMENT ---###
+	function increment($propertyName,$step=1){
+		foreach($this as $k=>$v)
+			$this[$k]->{$dataKey}+=$step;
+		return $this;
+	}
+	function decrement($propertyName,$step=1){
+		foreach($this as $k=>$v)
+			$this[$k]->{$dataKey}-=$step;
+		return $this;
+	}
 
 	/**
 	* allow to load datas for model in collection all at once.
@@ -216,10 +337,14 @@ class modelCollection extends arrayObject{
 		if(empty($copy))
 			return $this;
 		$needLoad=false;
-		foreach($copy as $v){
+		foreach($copy as $k=>$v){
 			if( $v instanceof abstractModel){
-				if( $v->deleted ) #- drop deleted models
+				if( $v->deleted ){ #- drop deleted models
 					unset($this[$v->PK]);
+				}elseif($k !== $v->PK){ #- ensure key integrity for models that are not temporary anymore
+					unset($this[$k]);
+					$this[] = $v;
+				}
 				continue;
 			}
 			$modelLoaded = abstractModel::isLivingModelInstance($this->collectionType,$v,true);
@@ -243,7 +368,7 @@ class modelCollection extends arrayObject{
 				return $this;
 			foreach($rows as $row){
 				$PK = $row[$primaryKey];
-				$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true);
+				$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true,true);
 			}
 		}
 
@@ -255,22 +380,40 @@ class modelCollection extends arrayObject{
 
 		return $this;
 	}
-	/**
-	* return current model
-	*/
+	/** return current model in collection @return abstractModel or null */
 	function current(){
-		if(count($this) < 1)
-			return false;
-		return $this->getIterator()->current();
+		if( count($this) < 1) return null;
+		$m = current($this);
+		if( false === $m ) return null;
+		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
-	/**
-	* create a new abstractModel matching $this->collectionType and append it to the collection
-	* @return abstractModel
-	*/
-	function appendNew(){
-		$m = abstractModel::getModelInstance($this->collectionType);
-		$this->append($m);
-		return $m;
+	/** return next model in collection @return abstractModel or null */
+	function next(){
+		if( count($this) < 1) return null;
+		$m = next($this);
+		if( false === $m ) return null;
+		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
+	}
+	/** return prev model in collection @return abstractModel or null */
+	function prev(){
+		if( count($this) < 1) return null;
+		$m = prev($this);
+		if( false === $m ) return null;
+		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
+	}
+	/** return first model in collection @return abstractModel or null */
+	function first(){
+		if( count($this) < 1) return null;
+		$m = current($this->getArrayCopy());
+		if( false === $m ) return null;
+		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
+	}
+	/** return last model in collection @return abstractModel or null */
+	function last(){
+		if( count($this) < 1) return null;
+		$m = end($this);
+		if( false === $m ) return null;
+		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
 
 	/**
@@ -300,8 +443,9 @@ class modelCollection extends arrayObject{
 	* @return $this for method chaining
 	*/
 	function delete($PK=null){
-		if( null===$PK)
+		if( null===$PK){
 			$PK = $this->PK;
+		}
 
 		if(is_array($PK)){
 			foreach($PK as $pk)
@@ -314,6 +458,8 @@ class modelCollection extends arrayObject{
 
 		return $this;
 	}
+
+	###--- SORTING METHODS ---###
 	/**
 	* sort collection by given datas property name
 	* @param str $sortBy   property to use to sort the collection
@@ -385,6 +531,108 @@ class modelCollection extends arrayObject{
 			return $res>0?-1:1;
 		return $res;
 	}
+
+	###--- FILTERING METHODS ---###
+	/**
+	* return a modelCollection that contains only models filtered by the given key that match expression
+	* @param string $propertyName           the property on which you want to apply filter
+	* @param mixed  $exp                    the value the property must match
+	* @param string $comparisonOperator     comparison operator to use default is ===
+	*                                       some example of what can be use there: <, >, <=, >=, ==
+	*                                       you can also use 'preg' to filter by using preg_match, in which case
+	*                                       $exp must be a valid PCRE regexp
+	* return modelCollection a new modelCollection with only matching elements
+	*/
+	public function filterBy($propertyName,$exp,$comparisonOperator=null){
+		$filtered = array();
+		if( null===$comparisonOperator || '===' === $comparisonOperator){
+			foreach($this->{$propertyName} as $k=>$v){
+				if( $v === $exp)
+					$filtered[] = $this[$k];
+			}
+		}elseif( 'preg' === $comparisonOperator ){
+			foreach($this->{$propertyName} as $k=>$v){
+				if( preg_match($exp,$v) )
+					$filtered[] = $this[$k];
+			}
+		}else{
+			foreach($this->{$propertyName} as $k=>$v)
+				eval('if( $v '.$comparisonOperator.' $exp) $filtered[] = $this[$k];');
+		}
+		return abstractModel::getMultipleModelInstances($this->collectionType,$filtered);
+	}
+
+	/**
+	* like array_map but for modelCollection.
+	* you can also specify the propertyName you want to apply callBack on.
+	* @Note: don't forget that unless you've worked on a cloned collection you will
+	*        modify all living instances of models in the collection so use this with care!
+	* @param callable $callBack     any valid callable as define in call_user_func
+	* @param string   $propertyName optionnal name of property you want to apply callback on
+	* @return $this for method chaining
+	*/
+	public function map($callBack,$propertyName=null){
+		$this->loadDatas();
+		if( null === $propertyName ){
+			foreach($this as $instance)
+				call_user_func($callBack,$instance);
+		}else{
+			foreach($this as $instance)
+				$instance->{$propertyName} = call_user_func($callBack,$instance->{$propertyName});
+		}
+		return $this;
+	}
+
+	/**
+	* will clone all instances of models in collection, this can be used to apply some methods on collection
+	* without modifying real instances of models that live in the rest of the programm
+	* (example you can apply a modelCollection::map('strtoupper',$propertyName) for rendering purpose,
+	*  whitout really impacting living instance.)
+	*/
+	public function clonedCollection(){
+		$this->loadDatas();
+		$clone = new modelCollection($this->collectionType);
+		foreach($this as $k=>$v){
+			$clone[$k] = clone $v;
+		}
+		return $clone;
+	}
+
+	###--- HTML HELPERS ---###
+	/**
+	* return a html string containing option elements for each models in the collection.
+	* (the value parameter is always the primaryKey field)
+	* @param string $labelString   string of labels where %dataKey will be replaced with their corresponding values
+	* @param mixed  $selected      the model selected or it's PK value
+	* @param mixed  $removedModels modelCollection or list of models PK to exclude from the results
+	* @return string html
+	*/
+	public function htmlOptions($labelString,$selected=null,$removedModels=null,$disabledModels=null){
+		$opts = array();
+		if( $selected instanceof $this->collectionType)
+			$selected = $selected->PK;
+		#- $removedModels must be an array of instance keys
+		if(null === $removedModels)
+			$removedModels = array();
+		if( $removedModels instanceof modelCollection )
+			$removedModels = $removedModels->PK;
+		$removedModels = array_flip($removedModels);
+		#- same for disabled models
+		if(null === $disabledModels)
+			$disabledModels = array();
+		if( $disabledModels instanceof modelCollection )
+			$disabledModels = $disabledModels->PK;
+		$disabledModels = array_flip($disabledModels);
+		foreach($this as $item){
+			if( isset($removedModels[$item->PK]) )
+				continue;
+			#- prepare label
+			$label  = preg_replace('!%('.$this->_datasKeyExp.')!ie','$item->\\1',$labelString);
+			$opts[] = "<option value=\"$item->PK\"".($selected === $item->PK?' selected="selected"':'')
+			.(isset($disabledModels[$item->PK])?' disabled="disabled"':'').">$label</option>";
+		}
+		return implode("\n\t",$opts);
+	}
 }
 
 abstract class abstractModel{
@@ -414,6 +662,12 @@ abstract class abstractModel{
 	protected $filtersMsgs = array();
 	#- set this on true to bypass filters when required (modelCollection use at loadDatas() time)
 	public $bypassFilters = false;
+	/** specificly added for simpleMVC.
+	* this is meant to be the name of langManager dictionary where filtersMsgs will be looked for.
+	* leave to null if you don't want to use this stuff. you can also defined a not static property
+	* filtersDictionary inside models final class if you want to override this default setting.
+	*/
+	static public $dfltFiltersDictionary = null;
 
 	/**
 	* specify one to one relations between models
@@ -455,6 +709,15 @@ abstract class abstractModel{
 	static protected $primaryKey = 'id';
 
 	/**
+	* hold modelAddons names the model can manage
+	*/
+	static protected $modelAddons = array();
+	/**
+	* hold instances of addons attached to the model
+	*/
+	protected $_modelAddons = array();
+
+	/**
 	* will keep trace of each model instances to permit uniques instances
 	* of any models.
 	*/
@@ -468,41 +731,36 @@ abstract class abstractModel{
 	/**
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
 	*/
-	static public $useDbProfiler = false;
+	static public $useDbProfiler = true;
 
 	/**
 	* only for debug purpose
 	* @todo delete this debug method
 	*/
-	static public function showInstances($compact=false){
+	static public function showInstances($compact=true){
 		if(! $compact)
 			return show(self::$instances);
+		$res = array();
 		foreach(self::$instances as $model=>$instances){
-			$res[$model] = array_keys($instances);
+			if( $compact === true ){
+				$res[$model] = array_keys($instances);
+			}else{
+				$res[$model] = new modelCollection($model,$instances);
+				$res[$model] = $res[$model]->{$compact};
+			}
 		}
-		show($res);
+		show($res,'color:#055;');
 	}
 	/**
 	* create an instance of model.
 	* @param str  $PK       if given retrieve the datas for the given primary key object.
 	*                       else return a new empty model object.
+	* @param bool $isDummyInstance this is only there for internal purpose (such as call to getModelDbAdapter method)
 	* @param bool $fullLoad if true then will load all related object at construction time.
 	*
 	*/
-	protected function __construct($PK=null){
-		$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
-		if( self::$useDbProfiler )
-		$this->dbAdapter = new dbProfiler($this->dbAdapter);
-		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-		if( $PK !== null){
-			$this->datas = $this->dbAdapter->select_single_to_array(self::_getModelStaticProp($this,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
-			#- ~ foreach($this->datas as $k=>$v){
-				#- ~ self::setModelDatasType($this,$k,$this->datas[$k]);
-			#- ~ }
-		}else{
-			$this->datas[$primaryKey] = uniqid('abstractModelTmpId',true);
-		}
-		#- then set some internalDatas for further access
+	protected function __construct($PK=null,$isDummyInstance=false){
+		#- first set some internalDatas for easier further access
 		if( empty(self::$_internals[get_class($this)]) ){
 			$oneKeys = $manyKeys = $datasKeys = array();
 			#- prepare related keys exp
@@ -521,6 +779,41 @@ abstract class abstractModel{
 				$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
 			self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
 		}
+
+		#- get dbAdapter instance
+		$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
+		if( self::$useDbProfiler )
+			$this->dbAdapter = new dbProfiler($this->dbAdapter);
+
+		if( $isDummyInstance )
+			return;
+
+		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
+
+		#- then check for addons to embed
+		$modelAddons = self::_getModelStaticProp($this,'modelAddons');
+		if( ! empty($modelAddons) ){
+			foreach($modelAddons as $addon){
+				$addonClass = $addon.'ModelAddon';
+				$_addon = new $addonClass($this,$PK);
+				$this->_modelAddons[$addon] = $_addon;
+			}
+			#- check addons haven't already set datas y checking primary key
+			if( $PK !== null){
+				self::setModelDatasType($this,$primaryKey,$this->datas[$primaryKey]);
+				if( $this->datas[$primaryKey] === $PK ) #- considering that datas has been setted by addons
+					return;
+			}
+		}
+
+		#- finally set datas
+		if( $PK === null){
+			$this->datas[$primaryKey] = uniqid('abstractModelTmpId',true);
+			return ;
+		}
+		$this->datas = $this->dbAdapter->select_single_to_array(self::_getModelStaticProp($this,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
+		if( false !== $this->datas )
+			$this->setModelDatasTypes();
 	}
 
 	/**
@@ -532,7 +825,23 @@ abstract class abstractModel{
 		if($oldKey !== null) # remove temporary key at save time
 			unset(self::$instances[strtolower(get_class($instance))][$oldKey]);
 		self::$instances[strtolower(get_class($instance))][$instance->PK] = $instance;
-		#- then update related models with correct values
+		#- then update related models with correct values would be fine but how to achieve this (pattern observer?) ?
+	}
+
+	/**
+	* check if there is any living (already loaded) instance of the given model for matching PK
+	* @param string $modelName   model name
+	* @param mixed  $PK          value of the primary key
+	* @param bool   $returnModel set this to true to return living model instead of true on success
+	* @return bool or abstractModel if $returnModel is true
+	*/
+	static public function isLivingModelInstance($modelName,$PK,$returnModel=false){
+		#- ~ show($PK,(isset(self::$instances[strtolower($modelName)][$PK])?true:false),'color:green');
+		if(! isset(self::$instances[strtolower($modelName)][$PK])){
+			#- ~ self::showInstances('datas');
+			return false;
+		}
+		return $returnModel?self::$instances[strtolower($modelName)][$PK]:true;
 	}
 
 	/**
@@ -561,11 +870,13 @@ abstract class abstractModel{
 	* @param string $modelName
 	* @param array  $datas
 	* @param bool   $dontOverideIfExists this only make sense if you have the primaryKey field set in datas
-	*                                     in this case if true and a living instance (not checked in database but in loaded instances) is found then it will simply return the instance as found
-	*                                     else it will set instance datas to the one given. (can be of help to set multiple keys at once)
+	*                                    in this case if true and a living instance (not checked in database but in loaded instances) is found then it will simply return the instance as found
+	*                                    else it will set instance datas to the one given. (can be of help to set multiple keys at once)
 	* @param bool   $bypassFilters       if true then will bypass datas filtering
+	* @param bool   $leaveNeedSaveState  by default setting datas will set $this->needSave to 1, setting this parameter to true
+	*                                    will leave $this->needSave to its previous state (generally used by modelCollection::loadDatas()).
 	*/
-	static public function getModelInstanceFromDatas($modelName,$datas,$dontOverideIfExists=false,$bypassFilters=false){
+	static public function getModelInstanceFromDatas($modelName,$datas,$dontOverideIfExists=false,$bypassFilters=false,$leaveNeedSaveState=false){
 		# check for living instance
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$instance   = false;
@@ -587,30 +898,7 @@ abstract class abstractModel{
 			self::_setInstanceKey($instance,$oldPK);
 		}
 		#- set Datas
-		return $instance->_setDatas($datas,$bypassFilters);
-	}
-
-	/**
-	* set multiples model datas values at once from an array.
-	* @param array  $datas          array of key value pair of datas to set.
-	*                               unknown keys or keys corresponding to primarykey will just be ignored.
-	* @param bool   $bypassFilters  if true then will bypass datas filtering
-	* @return $this for method chaining, you can check filtersMsgs after that call to know if there's some errors
-  * @note this method is prepend with a '_' to allow you to still have user define setter for an eventual field named fromDatas (who knows you can need it)
- 	*/
-	public function _setDatas($datas,$bypassFilters=false){
-		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
-		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-		$filtersState = $this->bypassFilters;
-		if($bypassFilters)
-			$this->bypassFilters = true;
-		foreach($datas as $k=>$v){
-			if( (! isset($datasDefs[$k])) || $k===$primaryKey)
-				continue;
-			$this->$k = $v;
-		}
-		$this->bypassFilters = $filtersState;
-		return $this;
+		return $instance->_setDatas($datas,$bypassFilters,null,$leaveNeedSaveState);
 	}
 
 	/**
@@ -620,7 +908,7 @@ abstract class abstractModel{
 	* @return modelCollection indexed by their primaryKeys
 	*/
 	static public function getMultipleModelInstances($modelName,array $PKs){
-		return new modelCollection($modelName,empty($PKs)?$PKs:array_combine($PKs,$PKs));
+		return new modelCollection($modelName,$PKs);
 	}
 
 	/**
@@ -630,7 +918,6 @@ abstract class abstractModel{
 	* @return modelCollection indexed by their primaryKeys
 	*/
 	static public function getFilteredModelInstances($modelName,$filter=null){
-		#@todo find a way to avoid use of a tmpModel
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$db = self::getModelDbAdapter($modelName);
@@ -697,7 +984,7 @@ abstract class abstractModel{
 		if( $rows ===false )
 			return $collection;
 		foreach($rows as $row)
-			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
+			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
 		if( null !== $withRelated )
 			$collection->loadDatas($withRelated);
 		return $collection;
@@ -722,7 +1009,7 @@ abstract class abstractModel{
 			return array($collection,'',0);
 		list($rows,$nav,$total) = $rows;
 		foreach($rows as $row)
-			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true);
+			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
 		if( null !== $withRelated )
 			$collection->loadDatas($withRelated);
 		return array($collection,$nav,$total);
@@ -734,21 +1021,7 @@ abstract class abstractModel{
 	* @return array() sliceAttrs (full attrs)
 	*/
 	static public function _setModelPagedNav($modelName,$sliceAttrs=null){
-		$db = self::getModelDbAdapter($modelName);
-		return $db->set_slice_attrs($sliceAttrs);
-	}
-	
-	/**
-	* check if there is any living (already loaded) instance of the given model for matching PK
-	* @param string $modelName   model name
-	* @param mixed  $PK          value of the primary key
-	* @param bool   $returnModel set this to true to return living model instead of true on success
-	* @return bool or abstractModel if $returnModel is true
-	*/
-	static public function isLivingModelInstance($modelName,$PK,$returnModel=false){
-		if(! isset(self::$instances[strtolower($modelName)][$PK]))
-			return false;
-		return $returnModel?self::$instances[strtolower($modelName)][$PK]:true;
+		return self::getModelDbAdapter($modelName)->set_slice_attrs($sliceAttrs);
 	}
 
 	/**
@@ -835,10 +1108,24 @@ abstract class abstractModel{
 			if( empty($relDef['linkTable']) ){
 				return $this->_manyModels[$relName] = abstractModel::getFilteredModelInstances(
 					$relDef['modelName'],
-					array("WHERE $relDef[foreignField] =?",$localFieldVal)
+					array("WHERE $relDef[foreignField] =?".(empty($relDef['orderBy'])?'':" ORDER BY $relDef[orderBy]"),$localFieldVal)
 				);
 			}else{
-				$PKs = $this->dbAdapter->select_col($relDef['linkTable'],$relDef['linkForeignField'],array("WHERE $relDef[linkLocalField]=?",$localFieldVal));
+				if( empty($relDef['orderBy']) ){
+					$PKs = $this->dbAdapter->select_col(
+						$relDef['linkTable'],
+						$relDef['linkForeignField'],
+						array("WHERE $relDef[linkLocalField]=?",$localFieldVal)
+					);
+				}else{
+					$relTable      = self::_getModelStaticProp($relDefs['modelName'],'tableName');
+					$relPrimaryKey = self::_getModelStaticProp($relDefs['modelName'],'primaryKey');
+					$PKs = $this->dbAdapter->select_col(
+						"$relDef[linkTable] LEFT JOIN $relTable ON $relDef[linkTable].$relDef[linkForeignField] = $relTable.$relPrimaryKey",
+						$relDef['linkForeignField'],
+						array("WHERE $relDef[linkTable].$relDef[linkLocalField]=? ORDER BY $relDef[orderBy]",$localFieldVal)
+					);
+				}
 				return $this->_manyModels[$relName] = abstractModel::getMultipleModelInstances($relDef['modelName'],empty($PKs)?array():$PKs);
 			}
 		}
@@ -867,7 +1154,9 @@ abstract class abstractModel{
 		#- then protected properties (make them kind of read only values)
 		if( isset($this->$k) )
 			return $this->$k;
-
+		#- finally common static properties
+		if( in_array($k,array('modelName','tableName','primaryKey','datasDefs','hasOne','hasMany','filters'),1) )
+			return self::_getModelStaticProp($this,$k);
 		#- nothing left throw an exception
 		throw new Exception(get_class($this)."::$k unknown property.");
 	}
@@ -891,7 +1180,6 @@ abstract class abstractModel{
 		if( method_exists($this,"set$k") ){
 			return $this->{"set$k"}($this->bypassFilters?$v:$this->filterData($k,$v));
 		}
-
 		$this->needSave = 1;
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		if(isset($hasOne[$k])){
@@ -911,7 +1199,7 @@ abstract class abstractModel{
 			switch( $hasOne[$k]['relType']){
 				case 'dependOn': #- check for data integrity REQUIRED so if we must check in database load the model at this time
 					if($this->bypassFilters || self::existsModelPK($relModelName,$v))
-						return $this->datas[$localField] = $v;
+						return $this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					else
 						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
 					break;
@@ -919,7 +1207,7 @@ abstract class abstractModel{
 				case 'ignored':    #- at least if datas are really invalid it will trigger a databse error at save time
 					if($localField===$thisPrimaryKey)
 						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
-					return $this->datas[$localField] = $v;
+					return $this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					break;
 			}
 		}
@@ -940,8 +1228,9 @@ abstract class abstractModel{
 			$this->_manyModels[$k] = $v;
 		}*/
 
-		if(isset($this->datas[$k]))
+		if(isset($this->datas[$k])){
 			return $this->datas[$k] = self::setModelDatasType($this,$k,$v);
+		}
 
 		throw new Exception(get_class($this)." trying to set unknown property $k.");
 
@@ -951,23 +1240,44 @@ abstract class abstractModel{
 		return isset($this->datas[$k]);
 	}
 
+	/**
+	* manage dynamic methods calls.
+	* here's a list of what type of calls are managed with a sample prototype and in the order they're looked for:
+	* - modelAddons methods (see corresponding modelAddons for methods definition)
+	* - append[_hasManyName|HasManyName](abstractModel $modelInstance=null) and return this
+	*   (also have appendNew[_hasManyName|HasManyName] equal to append[_hasManyName|HasManyName](null))
+	* - set[_hasManyName|HasManyName]Collection(array|modelCollection $collection) and return this
+	* - get[_has*Name|Has*Name]() is shorthand for getRelated($has*Name) see getRelated() methods for more infos
+	* - get[_dataKey|DataKey]() return the corresponding value in this->datas
+	* - set[_dataKey|DataKey]($value,$bypassFilters=false,$leaveNeedSaveState=false) shortHand for _setData($dataKey,...) return this
+	* if none of above methods are found then it throw an exception
+	*/
   public function __call($m,$a){
 		$className = get_class($this);
 
+		#- first check for modelAddons methods
+		foreach($this->_modelAddons as $addon){
+			if( method_exists($addon,$m) ){
+				return call_user_func_array(array($addon,$m),$a);
+			}
+		}
+
 		#- manage add methods for hasMany related
-		if(preg_match('!^append_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
-			$relName = self::_cleanKey($this,'hasMany',$match[1]);
+		if(preg_match('!^append(_new|New)_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
+			$relName = self::_cleanKey($this,'hasMany',$match[2]);
 			if($relName===false)
 				throw new Exception("$className trying to call unknown method $m with no matching hasMany[$match[1]] definition.");
 			$modelCollection = $this->getRelated($relName);
 			$model = array_shift($a);
 			$hasMany = self::_getModelStaticProp($this,'hasMany');
-			if(null===$model)
+			if(null===$model || $match[1])
 				$model = self::getModelInstance($hasMany[$relName]['modelName']);
 			$modelCollection[] = $model;
 			if(isset($hasMany[$relName]['localField']))
 				$this->needSave = 1;
-			return $this; #- @todo make reflection on what should be return for now i thing taht allowing method chaining can be nice
+			if( isset($hasMany[$relName]['foreignField']) ) # set reverse relation
+				$model->{$hasMany[$relName]['foreignField']} = isset($hasMany[$relName]['localField'])?$this->{$hasMany[$relName]['localField']}:$this->PK;
+			return $match[1]?$model:$this;#- @todo make reflection on what should be return for now i think that allowing method chaining can be nice
 		}
 
 		#- manage setter methods for hasMany related
@@ -983,6 +1293,10 @@ abstract class abstractModel{
 			elseif(! $collection instanceof modelCollection )
 				throw new Exception("$className::$m invalid parameter $collection given, modelCollection expected.");
 			$this->_manyModels[$relName] = $collection;
+			#- set la relation dans l'autre sens
+			$relDef = self::_getModelStaticProp($this->modelName,'hasMany');
+			if(! empty($relDef[$relName]['foreignField']) )
+				$this->_manyModels[$relName]->{$relDef[$relName]['foreignField']} = empty($relDef[$relName]['localField'])?$this->PK:$this->{$relDef[$relName]['localField']};
 			return $this; #- @todo make reflection on what should be return for now i thing that allowing method chaining can be nice
 		}
 
@@ -996,7 +1310,7 @@ abstract class abstractModel{
 				return $this->datas[self::_cleanKey($this,'datas',$match[2])];
 			}else{
 				array_unshift($a,self::_cleanKey($this,'datas',$match[2]));
-				call_user_func_array(array($this,'__set'),$a);
+				call_user_func_array(array($this,'_setData'),$a);
 				return $this;
 			}
 		}
@@ -1012,7 +1326,7 @@ abstract class abstractModel{
 	* @return string clean key or false if not find
 	* @private
 	*/
-	static private function _cleanKey($modelName,$keyType,$k){
+	static public function _cleanKey($modelName,$keyType,$k){
 		if( $keyType === 'datas')
 			$keyType = 'datasDefs';
 		$datas = self::_getModelStaticProp($modelName,$keyType);
@@ -1029,16 +1343,105 @@ abstract class abstractModel{
 		return false;
 	}
 
-	static public function setModelDatasType($modelName,$key,&$value){
+	/**
+	* set multiples model datas values  at once from an array.
+	* @param array  $datas              array of key value pair of datas to set.
+	*                                   unknown keys or keys corresponding to primarykey will just be ignored.
+	* @param bool   $bypassFilters      if true then will bypass datas filtering but will restore $this->bypassFilters to it's previous state
+	* @param mixed  $forcedPrimaryKey   you should NEVER use this parameter outside abstractModel::__construct().
+	*                                   as it will break the self::instances key integrity!
+	*                                   in fact the only reason to use this at this time is to permit modelAddons to
+	*                                   set primaryKey during the modelConstruction phase.
+	* @param bool   $leaveNeedSaveState by default setting datas will set $this->needSave to 1, setting this parameter to true
+	*                                   will leave $this->needSave to its previous state.
+	* @return $this for method chaining, you can check filtersMsgs after that call to know if there's some errors
+  * @note this method is prepend with a '_' to allow you to still have user define setter for an eventual field named datas (who knows you can need it)
+ 	*/
+	public function _setDatas($datas,$bypassFilters=false,$forcedPrimaryKey=null,$leaveNeedSaveState=false){
+		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
+		$filtersState = $this->bypassFilters;
+		if(false !== $leaveNeedSaveState )
+			$leaveNeedSaveState = $this->needSave;
+		if($bypassFilters)
+			$this->bypassFilters = true;
+		foreach($datas as $k=>$v){
+			if( (! isset($datasDefs[$k])) || $k===$primaryKey)
+				continue;
+			$this->$k = $v;
+		}
+		$this->bypassFilters = $filtersState;
+		if( null !== $forcedPrimaryKey )
+			$this->datas[$primaryKey] = self::setModelDatasType($this,$primaryKey,$forcedPrimaryKey);
+		if(false !== $leaveNeedSaveState )
+			 $this->needSave = $leaveNeedSaveState;
+		return $this;
+	}
+
+
+	/**
+	* same as _setDatas but for a unique data key.
+	* @param string $key    datas key to set
+	* @param mixed  $value  value to set (will be convert to correct type)
+	* @param bool   $bypassFilters      if true then will bypass datas filtering but will restore $this->bypassFilters to it's previous state
+	* @param bool   $leaveNeedSaveState by default setting datas will set $this->needSave to 1, setting this parameter to true
+	*                                   will leave $this->needSave to its previous state.
+	*
+	*/
+	function _setData($key,$value,$bypassFilters=false,$leaveNeedSaveState=false){
+		$filterState = $this->bypassFilters;
+		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+		if(false !== $leaveNeedSaveState )
+			$leaveNeedSaveState = $this->needSave;
+		if($bypassFilters)
+			$this->bypassFilters=true;
+
+		$this->$key = self::setModelDatasType($this,$key,$value);
+
+		$this->bypassFilters = $filterState;
+		if(false !== $leaveNeedSaveState )
+			$this->needSave = $leaveNeedSaveState;
+		return $this;
+	}
+
+	/**
+	* setType of all datas in model at once (called at __construct time)
+	*/
+	public function setModelDatasTypes(){
+		$datasDefs  = self::_getModelStaticProp($this,'datasDefs');
+		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
+		foreach($datasDefs as $k=>$v){
+			if( $k===$primaryKey && $this->isTemporary() )
+				continue;
+			self::_setType($this->datas[$k],$datasDefs[$k]['Type']);
+		}
+	}
+	/**
+	* setType of one datas Key in model (call at __set time) according to types
+	* defined in datasDefs
+	* @param string $modelName
+	* @param string $key
+	* @param mixed  $value passed by reference
+	* @return $value with type setted
+	*/
+	static public function setModelDatasType($modelName,$key,&$value=null){
 		if($value===null)
 			return null;
 		$datasDefs = self::_getModelStaticProp($modelName,'datasDefs');
 		if(! isset($key) )
 			throw new exception((is_object($modelName)?get_class($modelName):$modelName)."::setModelDatasType() $key is not a valid datas key.");
-		$type     = $datasDefs[$key]['Type'];
-		if( preg_match('!int|timestamp!i',$type))
+		return self::_setType($value,$datasDefs[$key]['Type']);
+	}
+	/**
+	* internal method to setType from database type definition
+	* @param mixed  $value   passed by reference
+	* @param string $typeStr as given in create Table SQL statement
+	* @return mixed value with the required type setted
+	*/
+	static protected function _setType(&$value,$typeStr){
+		if( preg_match('!int|timestamp!i',$typeStr))
 			$type = 'int';
-		elseif(preg_match('!float|real|double!i',$type))
+		elseif(preg_match('!float|real|double!i',$typeStr))
 			$type = 'float';
 		else
 			$type = 'string';
@@ -1080,9 +1483,19 @@ abstract class abstractModel{
 
 	/**
 	* append a message to the filterMsg stack
+	* @param string $msg message or langManager idMessage to append
+	* @param array  $sprintfDatas data substitution to make in msg using sprintf
 	* @return $this for method chaining
 	*/
-	public function appendFilterMsg($msg){
+	public function appendFilterMsg($msg,array $sprintfDatas=null){
+		if( isset($this->filtersDictionary) ){
+			$msg = langManager::msg($msg,$sprintfDatas,$this->filtersDictionary);
+		}elseif( null !== self::$dfltFiltersDictionary ){
+			$msg = langManager::lookUpMsg($msg,self::$dfltFiltersDictionary,$sprintfDatas);
+		}elseif(! empty($sprintfDatas)){
+			array_unshift($sprintfDatas,$msg);
+			$msg = call_user_func_array('sprintf',$sprintfDatas);
+		}
 		$this->filtersMsgs[] = $msg;
 		return $this;
 	}
@@ -1115,6 +1528,8 @@ abstract class abstractModel{
 		return eval("return $modelName::\$$staticProperty;");
 	}
 	static public function _makeModelStaticCall($modelName,$method){
+		if( $modelName instanceof abstractModel )
+			$modelName = self::_getModelStaticProp($modelName,'modelName');
 		if(func_num_args() <= 2)
 			return call_user_func("$modelName::$method");
 		$args = func_get_args();
@@ -1123,7 +1538,9 @@ abstract class abstractModel{
 	}
 	#- @todo passer dbadapter en static (ou au moins connectionStr)
 	static public function getModelDbAdapter($modelName){
-		$tmpModel = new $modelName;
+		if($modelName instanceof abstractModel)
+			return $modelName->dbAdapter;
+		$tmpModel = new $modelName(null,true);
 		$db = $tmpModel->dbAdapter;
 		self::destroy($tmpModel);
 		return $db;
@@ -1164,7 +1581,7 @@ abstract class abstractModel{
 	* @return int or false on error
 	*/
 	static public function getModelCount($modelName,$filter=null){
-		$tmpObj = new $modelName();
+		$tmpObj = new $modelName(null,true);
 		$tableName = self::_getModelStaticProp($modelName,'tableName');
 		$count = $tmpObj->dbAdapter->select_single_value($tableName,'count(*)',$filter);
 		return $count===false?0:(int) $count;
@@ -1366,7 +1783,7 @@ abstract class abstractModel{
 						#- update all at once
 						$rels = $this->getRelated($relName)->loadDatas();
 						$rels->{$relDef['foreignField']} = $relDef['foreignDefault'];
-						$rels->{$relDef['foreignField']}->save();
+						$rels->save();
 					}
 				break;
 			}
@@ -1376,10 +1793,11 @@ abstract class abstractModel{
 		$res = $this->dbAdapter->delete($tableName,array("WHERE $primaryKey=?",$this->PK));
 		if($res===false)
 			throw new Exception(get_class($this)."::delete() Error while deleting.");
+		$this->deleted = true;
 		$this->detach();
 	}
 
-	 public function isTemporary(){
+	public function isTemporary(){
 		return preg_match('!^abstractModelTmpId!',$this->PK)?true:false;
 	}
 
@@ -1398,11 +1816,11 @@ abstract class abstractModel{
 	* Detach current model instance from abstractModel::$instances.
 	* It's primary purpose is to free some space when object is no more used (on destroy or on delete for exemple)
 	* if you unset a model but didn't detach it before in fact it will still live in abstractModel::$instances
-	* but it can also be used to have multiple instance for the same model with same PK.
-	* (not really a good idea but who know perhaps in some case it can be usefull, let me know)
+	* You can think it may also be used to have multiple instance for the same model with same PK but you should better use clone object for this purpose!
+	* (I don't see any good reason to use this in other place but who know perhaps in some case it can be usefull, please let me know)
 	* @note if you have other variables that point to the same instance of model they will be detached too
 	*/
-	function detach(){
+	public function detach(){
 		$modelName = self::_getModelStaticProp($this,'modelName');
 		if( self::isLivingModelInstance($modelName,$this->PK) )
 			unset(self::$instances[strtolower($modelName)][$this->PK]);
@@ -1417,7 +1835,7 @@ abstract class abstractModel{
 	*                 so if you have multiple vars pointing on the same instance and only want to drop the given one
 	*                 you might think about using a simple unset instead of this one (so others vars won't be detach)
 	*/
-	static function destroy(abstractModel &$modelInstance){
+	static public function destroy(abstractModel &$modelInstance){
 		$modelInstance->detach();
 		$modelInstance = null;
 	}
