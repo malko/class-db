@@ -1,53 +1,20 @@
 <?php
 /**
-* @package DB
-* @subpackage model
+* @package class-db
+* @subpackage abstractModel
 * @author Jonathan Gotti <jgotti at jgotti dot org>
-* @licence LGPL
+* @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
-* @changelog - 2008-03-30 - separation of generator and the rest of code
+* @changelog - 2008-05-08 - add modelAddons property to final class
+*            - 2008-03-30 - separation of generator and the rest of code
 *                         - now generator conform to new relation definition as hasOne / hasMany
 *                           instead of one2one / one2many / many2many
 *                         - remove withRel parameter
-* @changelog - 2008-03-23 - better model generation :
+*            - 2008-03-23 - better model generation :
 *                           * support autoMapping
 *                           * can overwrite / append / or skip existing models
 *                           * can set a constant as dbConnectionStr
 *
-* @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
-*       require php >= 5.3 features such as late static binding and __callstatic() magic method
-*       you will have to satisfy yourself with getFilteredInstances() method until that
-*
-* @todo implement pagination
-*
-* @todo remove the $withRel parameter everywhere and permit dynamic load instead (thanks to modelCollection that help on this)
-* @todo redefine relations with more appropriate terminology and logic such as:
-*       -  hasOne  => array( 'model'=>modelName, 'localField'=>localField, dependancyType )
-*       -  hasMany => array( 'model'=>modelName, 'localField'=>localField, 'modelField' => modelField ,dependancyType )
-*       -  hasMany => array( 'model'=>modelName, 'thisRelField'=>fieldThatRefThisPK, 'linkTable' => linkTable, 'relRelField'=> fieldThatRefRelmodelPK ,dependancyType )
-*       dependancyTypes can be something like require, requiredBy, ignore and can permit to handle properly cascade saving and more important onDelete actions
-*       onDelete can be extend and call the parent::onDelete methods as required
-*
-* @todo gerer les sauvegardes en cascades des relations one2many
-* dans le cas du one2one on referencie une clef etrangere donc:(ex un/des livre(s) a/ont un auteur)
-* - l'objet one2one requiert la reference et donc doit sauver la reference avant sa propre sauvegarde
-* 	EN FAIT ON DEVRAIT POUVOIR PRÉCISER SI l'OBJET EST REQUIS OU NON (sort of belongTo)
-*
-* dans le cas d'une relation one2many on referencie des objets qui possendent une clef etrangere sur l'objet (un auteur a plusieurs livres)
-* - l'objet ne depend pas des objets qui ont une référence sur lui
-* - l'objet doit etre sauvé avant de pouvoir sauver les objets qui en dépendent
-* - l'objet doit savoir comment faire réagir les objets qui en dépendent lorsqu'il est supprimé
-*   (delete all, avoid own deletion while dependent objects exists, set a flag to indicate that it's not available anymore, ignore)
-* - serait interressant de pouvoir limiter le nombre de many d'une facon ou d'une autre, à réflechir.
-*
-* dans le cas des relations many2many on passe par une table de transition qui referencie d'autres objets (exemples les livres appartiennent ont plusieurs tags/categories)
-* 2 cas sont envisageables -> les objets sont interdependants ou au contraire sont indépendant les uns des autres
-* là c'est un cas qui merite encore reflexion, géront déjà le reste propel ne sait pas encore gérer ca nous nous y arriverons c'est un but important
-*
-* @todo typer les données et leur longueur
-* - il serait interressant que les classes filles aient connaissance des informations de type et de longueur des champs
-*   de facon a typer les variables mais aussi d'en verifier la longueure (<- pas forcement utile au pire c'est tronqué tant pis si les gens font n'importe quoi)
-*   ainsi proposé des validations par défaut sur les données et donc créer de nouveau type de données comme par exemple: email, url etc... qui sont des choses réccurentes
 */
 
 require_once(dirname(__file__).'/class-db.php');
@@ -280,8 +247,8 @@ class modelGenerator{
 			}
 		}
 		#- ~ prepare hasMany
-		$hasManys[] = "//   'relName'=> array('modelName'=>'modelName','relType'=>'ignored|dependOn|requireBy','foreignField'=>'fieldNameIfNotPrimaryKey'[,'localField'=>'fieldNameIfNotPrimaryKey','foreignDefault'=>'ForeignFieldValueOnDelete']),";
-		$hasManys[] = "//or 'relName'=> array('modelName'=>'modelName','linkTable'=>'tableName','linkLocalField'=>'fldName',''=>'linkForeignField'=>'fldName','relType'=>'ignored|dependOn|requireBy'),";
+		$hasManys[] = "//   'relName'=> array('modelName'=>'modelName','relType'=>'ignored|dependOn|requireBy','foreignField'=>'fieldNameIfNotPrimaryKey'[,'localField'=>'fieldNameIfNotPrimaryKey','foreignDefault'=>'ForeignFieldValueOnDelete','orderBy'=>'orderBy'=>'fieldName [asc|desc][,fieldName [asc|desc],...]']),";
+		$hasManys[] = "//or 'relName'=> array('modelName'=>'modelName','linkTable'=>'tableName','linkLocalField'=>'fldName','linkForeignField'=>'fldName','relType'=>'ignored|dependOn|requireBy',['orderBy'=>'fieldName [asc|desc][,fieldName [asc|desc],...]']),";
 		if(! empty($modelDesc['hasMany']) ){
 			foreach($modelDesc['hasMany'] as $relName=>$hasMany){
 				$manyStr = '';
@@ -418,6 +385,9 @@ require dirname(__file__).'/BASE_$modelName.php';
 	static protected \$filters = array();
 
 	static protected \$modelName = '$modelName';
+
+	/** names of modelAddons this model can manage */
+	static protected \$modelAddons = array();
 
 }
 ";
