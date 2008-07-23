@@ -1,12 +1,18 @@
 <?php
 /**
-* Ssqeleton class to construct an extended db class.
-* @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
+* Sqeleton class to construct an extended db class.
+* @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2004-2007  Jonathan Gotti
-* @package DB
+* @package class-db
+* @class sampledb
+* @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 */
 
+/**
+* Sqeleton class to construct an extended db class.
+* @class sampledb
+*/
 class sampledb extends db{
 	/** open connection to database */
 	function open(){}
@@ -18,9 +24,9 @@ class sampledb extends db{
   * @return bool
 	* check if applicable to your database implementation (exemple unusable for sqlite)
   */
-  function select_db($dbname=null){} 
-	/** 
-	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
+  function select_db($dbname=null){}
+	/**
+	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH'
 	* @see sqlitedb or mysqldb implementation for exemple
 	* @return array
 	*/

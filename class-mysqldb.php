@@ -3,10 +3,11 @@
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2003-2008  Jonathan Gotti
 * @package class-db
+* @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
-* @subpackage MYSQL
 * @since 2004-11-26 first splitted version
-* @changelog - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
+* @changelog
+*            - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
 *                           $setNamesOnSelectDb if both are null then nothing will happen else it will perform
 *                           a SET NAMES query on the selected database.
 *            - 2008-04-06 - autoconnect is now a static property
@@ -22,6 +23,11 @@
 * @todo revoir la methode check_conn() et open et close de facon a ce que check_conn aille dans base_db
 */
 
+/**
+* exented db class to use with mysql databases.
+* @class mysqldb
+* @example sample-mysqldb.php
+*/
 class mysqldb extends db{
 	/**
 	* allow the setting of mysql_connect $new_link parameter.

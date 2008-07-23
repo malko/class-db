@@ -1,15 +1,18 @@
 <?php
 /**
-* Base class for databases object.
+* Deprecated php4 version of base class for databases object.
 * @author Jonathan Gotti <nathan at the-ring dot homelinux dot net>
 * @copyleft (l) 2004-2007  Jonathan Gotti
-* @package DB
+* @package class-db
+* @class dbPHP4
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2006-04-16 first version
 * get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 * smart '?' on conditions strings
-* @changelog - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow 
-*                           the use of function, wild char or alias in fields list. 
+* @warning not maintained anymore
+* @changelog
+*            - 2007-03-28 - protect_field_names() isn't called automaticly anymore to allow
+*                           the use of function, wild char or alias in fields list.
 *                           will perhaps permit this again with a more effective regex in the future.
 *                           so at this time it's up to you to use this method as needed on any select_* method (still applyed for insert and update)
 *                         - move last_q2a_res assignment from fetch_res() method to query_to_array() (seems more ligical to me)
@@ -21,8 +24,8 @@
 *            - 2006-05-15 - new methods set_slice_attrs() and select_array_slice() to easily paginate your results
 */
 
-class db{
-	
+class dbPHP4{
+
 	/**Db hostname*/
 	var $host = null;
 	/**mysql username*/
@@ -49,13 +52,13 @@ class db{
 
 	var $beverbose = FALSE;
 	var $autoconnect = TRUE;
-	/** 
+	/**
 	*chr to protect fields names in queries
-	*@private 
+	*@private
 	*/
 	var $_protect_fldname = '`';
 
-	function db(){
+	function dbPHP4(){
 		if($this->autoconnect)
 			$this->open();
 	}
@@ -73,8 +76,8 @@ class db{
 	* @return bool
 	* /
 	function select_db($dbname=null){}*/
-	/** 
-	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH' 
+	/**
+	* take a resource result set and return an array of type 'ASSOC','NUM','BOTH'
 	* @see sqlitedb or mysqldb implementation for exemple
 	*/
 	function fetch_res($result_set,$result_type='ASSOC'){}
@@ -139,7 +142,7 @@ class db{
 	/**
 	* return the list of field in $table
 	* @param string $table name of the sql table to work on
-	* @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion 
+	* @param bool $extended_info if true will return the result of a show field query in a query_to_array fashion
 	*                           (indexed by fieldname instead of int if false)
 	* @return array
 	*/
@@ -163,7 +166,7 @@ class db{
 	/**
 	* return the result of a query to an array
 	* @param string $Q_str SQL query
-	* @param string $result_type 'ASSOC', 'NUM' et 'BOTH' 
+	* @param string $result_type 'ASSOC', 'NUM' et 'BOTH'
 	* @return array | false if no result
 	*/
 	function query_to_array($Q_str,$result_type='ASSOC'){
@@ -180,7 +183,7 @@ class db{
 	* @param string|array $Table
 	* @param string|array $fields
 	* @param string|array $conditions
-	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH' 
+	* @param string $res_type 'ASSOC', 'NUM' et 'BOTH'
 	* @Return  array | false
 	**/
 	function select_to_array($tables,$fields = '*', $conds = null,$result_type = 'ASSOC'){
@@ -192,7 +195,7 @@ class db{
 			$fld_str = '*';
 		//now the WHERE str
 		$conds_str = $this->process_conds($conds);
-		
+
 		$Q_str = "SELECT $fld_str FROM $tb_str $conds_str";
 		# echo "SQL : $Q_str\n;";
 		return $this->query_to_array($Q_str,$result_type);
@@ -231,10 +234,10 @@ class db{
 			return FALSE;
 	}
 	/**
-	* select a single table field and return all values 
+	* select a single table field and return all values
 	* @param string $table
 	* @param string $field name of the single field to retrieve
-	* @param mixed  $conds 
+	* @param mixed  $conds
 	* @return array or FALSE
 	*/
 	function select_field_to_array($table,$field,$conds=null){
@@ -261,7 +264,7 @@ class db{
 		$attrs = $this->set_slice_attrs();
 		extract($attrs);
 		$nbpages = ceil($tot/max(1,$pageNbRows));
-		
+
 		# start/prev link
 		if($nbpages > 1 && $pageId != 1){
 			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$first);
@@ -276,7 +279,7 @@ class db{
 		}else{
 			$last = $next = '';
 		}
-		
+
 		# pages links
 		if(preg_match('!%(\d+)?links!',$formatStr,$m)){
 			$nblinks = isset($m[1])?$m[1]:'';
@@ -294,10 +297,10 @@ class db{
 																		($i==$pageId?$curpage:$pages)
 																	);
 			}
-			
+
 			$links = implode($linkSep,$pageLinks);
 		}
-		
+
 		$formatStr = str_replace( array('%first','%prev','%next','%last','%'.$nblinks.'links','%tot','%nbpages','%page'),
 															array($first,$prev,$next,$last,$links,$tot,$nbpages,$pageId),
 															$formatStr
@@ -318,10 +321,10 @@ class db{
 	* - linkSep: separator between pages links
 	* - formatStr: is used to render the full pagination string
 	*              %start, %prev, %next, %last will be replaced respectively by corresponding links
-	*              %Nlinks will be replaced by the pages links. N is the number of link to display 
-	*              including the selected page ex: %5links will show 5 pages links 
+	*              %Nlinks will be replaced by the pages links. N is the number of link to display
+	*              including the selected page ex: %5links will show 5 pages links
 	* you can pass only the keys you want to replace ex: db::set_slice_attrs(array('linkStr'=>"myslice.php?page=%page"))
-	* all keys can also contain a %tot and %nbpages which will be replaced respectively by 
+	* all keys can also contain a %tot and %nbpages which will be replaced respectively by
 	* the total amount of result and the total number of pages
 	*@param array $attrs
 	*@return array
@@ -360,7 +363,7 @@ class db{
 			return FALSE;
 		$fld = $this->protect_field_names(array_keys($values));
 		$val = array_map(array($this,'prepare_smart_param'),$values);
-    
+
 		$Q_str = "INSERT INTO $table ($fld) VALUES (".$this->array_to_str($val).")";
 		if(! $this->query($Q_str) )
 			return FALSE;
@@ -457,16 +460,16 @@ class db{
 		if(! count($associatives_res))
 			return FALSE;
 		if($sort_keys)
-			ksort($associatives_res); 
+			ksort($associatives_res);
 		return $this->last_q2a_res = $associatives_res;
 	}
 	/*########## INTERNAL METHOD ##########*/
 
 	/**
 	* used by other methods to parse the conditions param of a QUERY.
-	* If $conds is string then nothing more is done. 
+	* If $conds is string then nothing more is done.
 	* If it's an array, the first value (index 0) will be consider as the full condition string and all '?' will be replaced by other values in the array (sort of sprintf).
-	* You can add a number before a ? to replace it by a given index in the array like 2? 
+	* You can add a number before a ? to replace it by a given index in the array like 2?
 	* @param string|array $conds
 	* @return string
 	* @private
@@ -500,7 +503,7 @@ class db{
 		}
 	}
 	/**
-	* used internally to prepare fields for queries 
+	* used internally to prepare fields for queries
 	* @param string|array $fields list of fields. it's up to you to protect fieldsname if you put in fields as string
 	* @private
 	*/
@@ -517,7 +520,7 @@ class db{
 		}
 		return $fields?$fields:false;
 	}
-	
+
 	function array_to_str($var,$sep=','){
 		return (is_string($var)?$var:(is_array($var)?implode($sep,$var):''));
 	}
@@ -553,7 +556,7 @@ class db{
 
 	/**
 	* return the list of field in $table
-	* @deprecated still here for compatibility with old version 
+	* @deprecated still here for compatibility with old version
 	* @use and @see db::list_table_fields() instead
 	* @param string $table name of the sql table to work on
 	* @param bool $extended_info will return the result of a show field query in a query_to_array fashion

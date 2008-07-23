@@ -1,14 +1,15 @@
 <?php
 /**
-* Base class for databases object.
+* @package class-db
+* @file
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2003-2008  Jonathan Gotti
-* @package class-db
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2006-04-16 first splitted version
-* get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
-* smart '?' on conditions strings
-* @changelog - 2008-04-14 - add location of queries and some colors to dbProfiler
+*  - get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
+*  - smart '?' on conditions strings
+* @changelog
+*            - 2008-04-14 - add location of queries and some colors to dbProfiler
 *            - 2008-04-10 - new class dbprofiler
 *            - 2008-04-06 - autoconnect is now a static property
 *                         - now db::getInstance call require on missing class-xxxxdb.php
@@ -35,16 +36,30 @@
 *            - 2006-12-05 - new method select_field_to_array()
 *            - 2006-05-15 - new methods set_slice_attrs() and select_array_slice() to easily paginate your results
 */
-class dbProfiler{
-	static public $precision     = 4;
 
-	static public $stats    = array();
-	protected $db           = null;
-	protected $statFuncs    = null;
+/**
+* this class is an encapsulator for any db extended class and is used to help profiling at developpment time.
+* @class dbProfiler
+* @see db
+* @code
+* // instanciate and encapsulate a db class
+* $db = new dbProfiler(db::getInstance());
+* // do your normal job as if you where working with any other class-db extended object
+* $db->list_tables();
+* //then when finished work print the report
+* $db->printReport();
+* @endcode
+*/
+class dbProfiler{
+	static public $precision = 4;
+
+	static public $stats     = array();
+	protected $db            = null;
+	protected $statFuncs     = null;
 
 	function __construct($dbInstance){
 		$this->db  = $dbInstance;
-		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','insert','query','query_to_array'));
+		$this->statFuncs = array_merge(array_keys(db::$aliases),array_values(db::$aliases),array('delete','update','insert','query','query_to_array','list_tables','list_table_fields','show_table_keys','optimize','get_count'));
 	}
 
 	function __get($k){
@@ -103,6 +118,10 @@ class dbProfiler{
 }
 
 
+/**
+* Base class for databases object.
+* @class db
+*/
 class db{
 	/** array of instances already created, one for each connection strings */
 	static protected $instances = array();

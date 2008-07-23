@@ -2,13 +2,18 @@
 /**
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2008  Jonathan Gotti
-* @package DB
+* @package class-db
+* @file
 * @since 2008-04
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
-* @subpackage SQLITE3
 * @todo add transactions support
 */
 
+/**
+* exented db class to use with sqlite3 databases.
+* require php sqlite3 extension to work
+* @class sqlite3db
+*/
 class sqlite3db extends db{
 	public $autocreate= TRUE;
 

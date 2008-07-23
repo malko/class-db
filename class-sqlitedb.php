@@ -2,10 +2,11 @@
 /**
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @copyleft (l) 2003-2008  Jonathan Gotti
-* @package DB
+* @package class-db
+* @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
-* @subpackage SQLITE
-* @changelog - 2008-04-06 - no more $mode parameter to construct the database (not managed by the extension at all so drop it)
+* @changelog
+*            - 2008-04-06 - no more $mode parameter to construct the database (not managed by the extension at all so drop it)
 *                         - drop php4 support, and buffered query are no longer supported (was useless as db has it's own buffer)
 *                         - autoconnect is now a static property
 *                         - add check_conn method
@@ -21,6 +22,11 @@
 * @todo add transactions support (you can use it on your own with query())
 */
 
+/**
+* exented db class to use with sqlite databases.
+* require php built-in sqlite support to work.
+* @class sqlitedb
+*/
 class sqlitedb extends db{
 	public $autocreate= TRUE;
 

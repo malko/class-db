@@ -1,6 +1,7 @@
 <pre><?php
 /**
 * sample script for class-mysqldb
+* @see mysqldb
 */
 
 require('class-db.php');

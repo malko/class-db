@@ -5,7 +5,8 @@
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
-* @changelog - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
+* @changelog
+*            - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
 *                         - setting related hasOne model by primaryKey will now set the correct type in the model datas array
 *            - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
 *                         - add remove method to modelCollection
@@ -64,7 +65,10 @@
 */
 
 require_once(dirname(__file__).'/class-db.php');
-
+/**
+* abstract class to ease modelAddons coding
+* @class modelAddon
+*/
 abstract class modelAddon{
 	protected $modelInstance = null;
 	protected $modelName     = null;
@@ -83,6 +87,12 @@ abstract class modelAddon{
 
 }
 
+/**
+* iterrator for modelCollection arrayObject.
+* You certainly won't instanciate this on your own please see modelCollection for further infos
+* @see modelCollection
+* @class modelCollectionIterator
+*/
 class modelCollectionIterator extends arrayIterator{
 	public $modelCollection=null;
 	function __construct($modelCollection){
@@ -98,7 +108,8 @@ class modelCollectionIterator extends arrayIterator{
 }
 
 /**
-* modelCollection is an arrayObject that permit to easily retrieve values from all models in the collection
+* modelCollection is an arrayObject that permit to easily work on a whole set of models at once (retrieving/setting values, sort and so on...).
+* @class modelCollection
 */
 class modelCollection extends arrayObject{
 	protected $collectionType = 'abstractModel';
@@ -635,6 +646,11 @@ class modelCollection extends arrayObject{
 	}
 }
 
+/**
+* provides all basics methods required by models.
+* abstractModel is also the place where all instances of models are kept in memory to allow each models to be loaded only once.
+* @class abstractModel
+*/
 abstract class abstractModel{
 	/**
 	* internal pointer to datas
