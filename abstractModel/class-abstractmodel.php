@@ -6,6 +6,9 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
+*            - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
+*            - 2008-07-23 - modelCollection::htmlOptions() can now take a collection or array as $selected parameter for multiple selection options
 *            - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
 *                         - setting related hasOne model by primaryKey will now set the correct type in the model datas array
 *            - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
@@ -73,6 +76,7 @@ abstract class modelAddon{
 	protected $modelInstance = null;
 	protected $modelName     = null;
 	protected $dbAdapter     = null;
+	protected $overloadedModelMethods = array();
 	/**
 	* create an instance of modelAddon, it receive the modelInstance before any datas settings
 	* so it also receive the requested instance primaryKey.
@@ -83,6 +87,19 @@ abstract class modelAddon{
 		$this->modelInstance = $modelInstance;
 		$this->modelName     = abstractModel::_getModelStaticProp($this->modelInstance,'modelName');
 		$this->dbAdapter     = $this->modelInstance->dbAdapter;
+	}
+
+	/**
+	* check if a modelAddon handle or not a given method (sort of methods_exists but can handle dynamic methods such as thoose managed by __call (in such case must be declared in self::$overloadedModelMethods);
+	* @param string $methodname
+	* @return bool
+	*/
+	public function isModelMethodOverloaded($methodName){
+		if( method_exists($this,$methodName) )
+			return true;
+		elseif( (! empty($this->overloadedModelMethods) ) && in_array($methodName,$this->overloadedModelMethods))
+			return true;
+		return false;
 	}
 
 }
@@ -615,12 +632,13 @@ class modelCollection extends arrayObject{
 	* (the value parameter is always the primaryKey field)
 	* @param string $labelString   string of labels where %dataKey will be replaced with their corresponding values
 	* @param mixed  $selected      the model selected or it's PK value
+	*                              can also be a list of PK or a modelCollection
 	* @param mixed  $removedModels modelCollection or list of models PK to exclude from the results
 	* @return string html
 	*/
 	public function htmlOptions($labelString,$selected=null,$removedModels=null,$disabledModels=null){
 		$opts = array();
-		if( $selected instanceof $this->collectionType)
+		if( $selected instanceof $this->collectionType || $selected instanceof modelCollection)
 			$selected = $selected->PK;
 		#- $removedModels must be an array of instance keys
 		if(null === $removedModels)
@@ -639,7 +657,11 @@ class modelCollection extends arrayObject{
 				continue;
 			#- prepare label
 			$label  = preg_replace('!%('.$this->_datasKeyExp.')!ie','$item->\\1',$labelString);
-			$opts[] = "<option value=\"$item->PK\"".($selected === $item->PK?' selected="selected"':'')
+			if(is_array($selected))
+				$_selected = in_array($item->PK,$selected);
+			else
+				$_selected = ($item->PK==$selected)?true:false;
+			$opts[] = "<option value=\"$item->PK\"".($_selected?' selected="selected"':'')
 			.(isset($disabledModels[$item->PK])?' disabled="disabled"':'').">$label</option>";
 		}
 		return implode("\n\t",$opts);
@@ -1273,7 +1295,7 @@ abstract class abstractModel{
 
 		#- first check for modelAddons methods
 		foreach($this->_modelAddons as $addon){
-			if( method_exists($addon,$m) ){
+			if( $addon->isModelMethodOverloaded($m) ){
 				return call_user_func_array(array($addon,$m),$a);
 			}
 		}
@@ -1475,8 +1497,20 @@ abstract class abstractModel{
 	public function filterData($k,$v){
 		$filters = self::_getModelStaticProp($this,'filters');
 		#- if no filters define check for a filterField method or simply return value
-		if( empty($filters[$k]) )
-			return (method_exists($this,"filter$k")?$v = $this->{"filter$k"}($v):$v);
+		if( empty($filters[$k]) ){
+			$filterName = "filter$k";
+			#- first look inside model for a filterMethod
+			if( method_exists($this,$filterName) )
+				return $this->{$filterName}($v);
+			#- if no filtering methods was found in model check if anAddon have such methods
+			foreach($this->_modelAddons as $addon){
+				if( $addon->isModelMethodOverloaded($filterName) ){
+					return call_user_func_array(array($addon,$filterName),array($v));
+				}
+			}
+			#- if no filtering methods was found at all then just return value
+			return $v;
+		}
 		#- if we go there we have a $this->filter defined for this field so apply it
 		if(count($filters[$k]) === 4){
 			list($cb,$params,$msg,$errorValue) = $filters[$k] ;
@@ -1856,4 +1890,3 @@ abstract class abstractModel{
 		$modelInstance = null;
 	}
 }
-
