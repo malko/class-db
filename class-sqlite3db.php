@@ -6,6 +6,8 @@
 * @file
 * @since 2008-04
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
+* @changelog 
+*            - 2008-07-29 - suppress a bug to avoid some error while trying to destroy twice the same last_qres. 
 * @todo add transactions support
 */
 
@@ -53,8 +55,10 @@ class sqlite3db extends db{
 	/** close connection to previously opened database */
 	function close(){
 		if( !is_null($this->db) ){
-			if($this->last_qres)
+			if($this->last_qres){
 				sqlite3_query_close($this->last_qres);
+				$this->last_qres = null;
+			}
 			sqlite3_close($this->db);
 		}
 		$this->db = null;
@@ -120,8 +124,11 @@ class sqlite3db extends db{
 				return FALSE;
 		}
 		$this->verbose($Q_str,__FUNCTION__,2);
-		if($this->last_qres)#- close unclosed previous qres
+		if($this->last_qres){#- close unclosed previous qres
 			sqlite3_query_close($this->last_qres);
+			$this->last_qres = null;
+		}
+
 		if( preg_match('!^\s*select!i',$Q_str) ){
 			$this->last_qres = sqlite3_query($this->db,$Q_str);
 			$res = $this->last_qres;
