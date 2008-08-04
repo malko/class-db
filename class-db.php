@@ -9,6 +9,7 @@
 *  - get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 *  - smart '?' on conditions strings
 * @changelog
+*            - 2008-07-30 - some minor changes in dbProfiler report representation and bug correction in colors
 *            - 2008-04-14 - add location of queries and some colors to dbProfiler
 *            - 2008-04-10 - new class dbprofiler
 *            - 2008-04-06 - autoconnect is now a static property
@@ -82,8 +83,9 @@ class dbProfiler{
 		);
 		$res  = call_user_func_array(array($this->db,$m),$a);
 		$stat[] = $this->get_microtime();
-		if( $res === false)
-			$stat[0] = '<span style="color:red;"'.$stat[0].'</span>';
+		if( $res === false){
+			$stat[0] = '<span style="color:red;">'.$stat[0].'</span>';
+		}
 		self::$stats[] = $stat;
 		return $res;
 	}
@@ -103,8 +105,8 @@ class dbProfiler{
 			$total += $time;
 		}
 		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;">
-		<caption style="text-align:left;font-weight:bold;" onclick="var body = document.getElementById(\'dbProfilerReport\');body.style.display=(body.style.display==\'none\'?\'table-row-group\':\'none\')">dbProfiler report</caption>
-		<thead><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
+		<caption style="text-align:left;font-weight:bold;cursor:pointer;" title="show / hide report details" onclick="var tb=this.parentNode;var disp=(tb.tBodies[0].style.display==\'none\'?\'table-row-group\':\'none\');tb.tBodies[0].style.display=disp;tb.tHead.style.display=disp; document.getElementById(\'dbProfilerButton\').innerHTML=(disp==\'none\'?\'&dArr;\':\'&uArr;\');"> <span id="dbProfilerButton" style="float:right;">&dArr;</span>dbProfiler report</caption>
+		<thead style="display:none;"><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
 		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
 		<tbody id="dbProfilerReport" style="display:none;">'.implode('',$rows)."</tbody>
 		</table>";
