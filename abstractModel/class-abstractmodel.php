@@ -6,6 +6,7 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-07-30 - bug correction in modelCollection::increment/decrement
 *            - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
 *            - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
 *            - 2008-07-23 - modelCollection::htmlOptions() can now take a collection or array as $selected parameter for multiple selection options
@@ -344,12 +345,12 @@ class modelCollection extends arrayObject{
   ###--- INCREMENT / DECREMENT ---###
 	function increment($propertyName,$step=1){
 		foreach($this as $k=>$v)
-			$this[$k]->{$dataKey}+=$step;
+			$this[$k]->{$propertyName}+=$step;
 		return $this;
 	}
 	function decrement($propertyName,$step=1){
 		foreach($this as $k=>$v)
-			$this[$k]->{$dataKey}-=$step;
+			$this[$k]->{$propertyName}-=$step;
 		return $this;
 	}
 
