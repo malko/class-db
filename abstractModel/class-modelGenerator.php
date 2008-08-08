@@ -7,6 +7,8 @@
 * @since 2007-10
 * @class modelGenerator
 * @changelog
+*            - 2008-08-05 - add empty property __toString for model rendering as string
+*            - 2008-08-04 - add additional methods proposition for filtering enums fields
 *            - 2008-05-08 - add modelAddons property to final class
 *            - 2008-03-30 - separation of generator and the rest of code
 *                         - now generator conform to new relation definition as hasOne / hasMany
@@ -228,7 +230,7 @@ class modelGenerator{
 		}
 
 		#- initVars
-		$datas = $datasTypes = $one2one = $one2many = $many2many = array();
+		$methods = $datas = $datasTypes = $one2one = $one2many = $many2many = array();
 
 		if( is_null($dbConnectionDefined) )
 			$dbConnectionDefined = "'$this->connectionStr'";
@@ -241,7 +243,19 @@ class modelGenerator{
 				$f['Default'] = 0;
 
 			$datas[]       = "'$f[Field]' => '$f[Default]', // $f[Type];";
-			$datasTypes[]  = "'$f[Field]' => array('Type'=>'$f[Type]', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>'$f[Default]'),";
+			$datasTypes[]  = "'$f[Field]' => array('Type'=>'".str_replace("'","\'",$f['Type'])."', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>'$f[Default]'),";
+			if( preg_match('!^\s*ENUM\s*\((.*)\)\s*$!i',$f['Type'],$m)){
+				$vals = $m[1];
+				$methods[] = "
+	public function filter".ucFirst($f['Field'])."(\$val){
+		\$vals=array($vals);
+		if(! in_array(\$val,\$vals)){
+			\$this->appendFilterMsg('invalid $f[Field] value');
+			return false;
+		}
+		return \$val;
+	}";
+			}
 		}
 
 		#- ~ prepare hasOne
@@ -399,9 +413,13 @@ class $modelName extends BASE_$modelName{
 
 	static protected \$modelName = '$modelName';
 
-	/** names of modelAddons this model can manage */
-	static protected \$modelAddons = array();
+	/** formatString to display model as string */
+	static public \$__toString = '';
 
+	/** names of modelAddons this model can manage */
+	static protected \$modelAddons = array();"
+	.(empty($methods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$methods)).
+	"
 }
 ";
 		$baseFile = $this->outputDir."BASE_$modelName.php";

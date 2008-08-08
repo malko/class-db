@@ -6,6 +6,8 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-08-06 - modelCollection::htmlOptions() will use default model::__toString() method to render empty labels
+*            - 2008-08-05 - add property and method __toString to abstractModel to ease string representation
 *            - 2008-07-30 - bug correction in modelCollection::increment/decrement
 *            - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
 *            - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
@@ -632,6 +634,7 @@ class modelCollection extends arrayObject{
 	* return a html string containing option elements for each models in the collection.
 	* (the value parameter is always the primaryKey field)
 	* @param string $labelString   string of labels where %dataKey will be replaced with their corresponding values
+	*                              if empty will use the default model::__toString method as label
 	* @param mixed  $selected      the model selected or it's PK value
 	*                              can also be a list of PK or a modelCollection
 	* @param mixed  $removedModels modelCollection or list of models PK to exclude from the results
@@ -657,7 +660,7 @@ class modelCollection extends arrayObject{
 			if( isset($removedModels[$item->PK]) )
 				continue;
 			#- prepare label
-			$label  = preg_replace('!%('.$this->_datasKeyExp.')!ie','$item->\\1',$labelString);
+			$label  = empty($labelString)?"$item":preg_replace('!%('.$this->_datasKeyExp.')!ie','$item->\\1',$labelString);
 			if(is_array($selected))
 				$_selected = in_array($item->PK,$selected);
 			else
@@ -771,6 +774,9 @@ abstract class abstractModel{
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
 	*/
 	static public $useDbProfiler = true;
+
+	/** formatString to display model as string */
+	static public $__toString = '';
 
 	/**
 	* only for debug purpose
@@ -1889,5 +1895,12 @@ abstract class abstractModel{
 	static public function destroy(abstractModel &$modelInstance){
 		$modelInstance->detach();
 		$modelInstance = null;
+	}
+
+	function __toString(){
+		$format = self::_getModelStaticProp($this,'__toString');
+		if( empty($format) )
+			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
+		return preg_replace('!%('.self::$_internals[get_class($this)]['datasKeyExp'].')!e','$this->\\1',$format);
 	}
 }
