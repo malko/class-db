@@ -7,6 +7,7 @@
 * @since 2007-10
 * @class modelGenerator
 * @changelog
+*            - 2008-08-13 - add method proposition to access enum fields possible values
 *            - 2008-08-05 - add empty property __toString for model rendering as string
 *            - 2008-08-04 - add additional methods proposition for filtering enums fields
 *            - 2008-05-08 - add modelAddons property to final class
@@ -248,13 +249,16 @@ class modelGenerator{
 				$vals = $m[1];
 				$methods[] = "
 	public function filter".ucFirst($f['Field'])."(\$val){
-		\$vals=array($vals);
-		if(! in_array(\$val,\$vals)){
+		if(! in_array(\$val,self::get".ucFirst($f['Field'])."PossibleValues())){
 			\$this->appendFilterMsg('invalid $f[Field] value');
 			return false;
 		}
 		return \$val;
-	}";
+	}
+	static public function get".ucFirst($f['Field'])."PossibleValues(){
+		return array($vals);
+	}
+	";
 			}
 		}
 

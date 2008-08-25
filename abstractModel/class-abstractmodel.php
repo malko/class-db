@@ -6,6 +6,14 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-08-20 - now modelCollection::filterBy() support in,!in,IN,!IN operators for in_array comparisons
+*                         - modelCollection::(in|de)crement() now call modelCollection::loadDatas() first
+*                         - now setting model datas values will only change needSave state to 1 if set to a new value;
+*            - 2008-08-19 - new modelCollection dynamic methods, filterBy[_]FieldName and [r]sortBy[_]FieldName
+*                         - __call now will call each instance methods and return their result as an array if no dynamic method was found
+*            - 2008-08-12 - new modelCollection::__toString() method
+*                         - add parameter $formatStr to modelCollection::__toString() and abstractModel::__toString() methods to override default format on explicit call
+*                         - modelCollection::htmlOptions() now call modelCollection::loadDatas() prior to rendering
 *            - 2008-08-06 - modelCollection::htmlOptions() will use default model::__toString() method to render empty labels
 *            - 2008-08-05 - add property and method __toString to abstractModel to ease string representation
 *            - 2008-07-30 - bug correction in modelCollection::increment/decrement
@@ -156,12 +164,12 @@ class modelCollection extends arrayObject{
 			$this->collectionType = $collectionType;
 			$modelInternals = abstractModel::_getModelStaticProp('abstractModel','_internals');
 			if( isset($modelInternals[$this->collectionType]) ){
-				$this->_datasKeyExp = $modelInternals[$this->collectionType]['datasKeyExp'];
+				$this->_datasKeyExp = $modelInternals[$this->collectionType]['datasKeyExp'].'|PK';
 			}else{
 				#- prepare datas keys exp
 				foreach(array_keys(abstractModel::_getModelStaticProp($this->collectionType,'datasDefs')) as $k)
 					$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-				$this->_datasKeyExp = implode('|',$datasKeys);
+				$this->_datasKeyExp = implode('|',$datasKeys).'|PK';
 			}
 		}
 	}
@@ -188,7 +196,7 @@ class modelCollection extends arrayObject{
 	/**
 	* remove a model from collection (not a delete)
 	* @param mixed $model the model instance to remove or its PK
-	*                     or a list of model instance/PK to remove
+	*                     or a list/collection of model instance/PK to remove
 	* @return bool false if any of the given model wasn't part of the collection
 	*/
 	function remove($model){
@@ -197,7 +205,7 @@ class modelCollection extends arrayObject{
 		if( is_null($model) )
 			$model = $this->PK;
 
-		if(is_array($model)){
+		if(is_array($model) || ($model instanceof modelCollection && $model->collectionType===$this->collectionType) ){
 			$ret = true;
 			foreach($model as $m)
 				$ret &= $this->remove($m);
@@ -311,7 +319,7 @@ class modelCollection extends arrayObject{
 		}
 		$res = array();
 		foreach($this as $mk=>$m){
-			$res[$mk] = $this[$mk]->$k;
+			$res[$mk] = $m->$k;
 		}
 		return $res;
 	}
@@ -320,7 +328,6 @@ class modelCollection extends arrayObject{
 	* set all models in collection property at once
 	*/
 	function __set($k,$v){
-
 		$this->loadDatas();
 		foreach($this as $mk=>$m){
 			if( isset($m->$k) )
@@ -328,29 +335,56 @@ class modelCollection extends arrayObject{
 		}
 	}
 	/**
-	* apply methods to all model in collection at once
+	* dynamic methods shorthands such as:
+	* - (increment|decrement)[_]FieldName($step=1)
+	* - filterBy[_]FieldName($matchExp,$comparisonOperator=null)
+	* - sortBy[_]FieldName($sortType=null);
+	* if none of the above was found then it will call model methods on all instances in the collection
+	* and return their results as an array indexed by instances primarykeys
 	* @return mixed
-	* @todo must have a reflection on what to accept or not and (what to return and when)
 	*/
 	function __call($m,$a){
 		# increments / decrements
 		if( preg_match("!^(de|in)crement_?($this->_datasKeyExp)$!",$m,$match) ){
-			$this->loadDatas();
 			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[2]);
 			if($match[1]==='de')
 				return $this->decrement($dataKey,empty($a[0])?1:$a[0]);
 			else
 				return $this->increment($dataKey,empty($a[0])?1:$a[0]);
 		}
+		#- filtering methods
+		if( preg_match("!^filterBy_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
+			return $this->filterBy($dataKey,$a[0],empty($a[1])?null:$a[1]);
+		}
+		#- sorting methods
+		if( preg_match("!^(r)?sortBy_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[2]);
+			$sortType = empty($a[0])?null:$a[0];
+			if( $match[1]==='r')
+				$this->rsort($dataKey,$sortType);
+			else
+				$this->sort($dataKey,$sortType);
+			return $this;
+		}
+
+		#- try model methods if not callable by models then model will throw an exception and that's the expected behavior
+		$res = array();
+		$this->loadDatas();
+		foreach($this as $k=>$instance)
+			$res[$k] = call_user_func_array(array($instance,$m),$a);
+		return $res;
 	}
 
   ###--- INCREMENT / DECREMENT ---###
 	function increment($propertyName,$step=1){
+		$this->loadDatas();
 		foreach($this as $k=>$v)
 			$this[$k]->{$propertyName}+=$step;
 		return $this;
 	}
 	function decrement($propertyName,$step=1){
+		$this->loadDatas();
 		foreach($this as $k=>$v)
 			$this[$k]->{$propertyName}-=$step;
 		return $this;
@@ -411,6 +445,7 @@ class modelCollection extends arrayObject{
 
 		return $this;
 	}
+
 	/** return current model in collection @return abstractModel or null */
 	function current(){
 		if( count($this) < 1) return null;
@@ -570,23 +605,30 @@ class modelCollection extends arrayObject{
 	* @param mixed  $exp                    the value the property must match
 	* @param string $comparisonOperator     comparison operator to use default is ===
 	*                                       some example of what can be use there: <, >, <=, >=, ==
-	*                                       you can also use 'preg' to filter by using preg_match, in which case
+	*                                       - you can also use 'preg' to filter by using preg_match, in which case
 	*                                       $exp must be a valid PCRE regexp
+	*                                       - 'in' and '!in' can be used with an array as $exp to check that value is or not in_array $exp
+	*                                       - 'IN' and '!IN' are like 'in' and '!in' but use a strict comparison
 	* return modelCollection a new modelCollection with only matching elements
 	*/
 	public function filterBy($propertyName,$exp,$comparisonOperator=null){
 		$filtered = array();
-		if( null===$comparisonOperator || '===' === $comparisonOperator){
+		if( null===$comparisonOperator || '===' === $comparisonOperator){ #- strict comparison
 			foreach($this->{$propertyName} as $k=>$v){
 				if( $v === $exp)
 					$filtered[] = $this[$k];
 			}
-		}elseif( 'preg' === $comparisonOperator ){
+		}elseif( 'preg' === $comparisonOperator ){ #- preg match comparison
 			foreach($this->{$propertyName} as $k=>$v){
 				if( preg_match($exp,$v) )
 					$filtered[] = $this[$k];
 			}
-		}else{
+		}elseif( in_array($comparisonOperator,array('in','!in','IN','!IN')) ){ # in array comparison
+			$strict=$comparisonOperator[strlen($comparisonOperator)-1]==='N'?true:false;
+			$not   = $comparisonOperator[0]==='!'?'!':'';
+			foreach($this->{$propertyName} as $k=>$v)
+				eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
+		}else{ #- user defined comparison
 			foreach($this->{$propertyName} as $k=>$v)
 				eval('if( $v '.$comparisonOperator.' $exp) $filtered[] = $this[$k];');
 		}
@@ -642,6 +684,7 @@ class modelCollection extends arrayObject{
 	*/
 	public function htmlOptions($labelString,$selected=null,$removedModels=null,$disabledModels=null){
 		$opts = array();
+		$this->loadDatas();
 		if( $selected instanceof $this->collectionType || $selected instanceof modelCollection)
 			$selected = $selected->PK;
 		#- $removedModels must be an array of instance keys
@@ -669,6 +712,22 @@ class modelCollection extends arrayObject{
 			.(isset($disabledModels[$item->PK])?' disabled="disabled"':'').">$label</option>";
 		}
 		return implode("\n\t",$opts);
+	}
+
+	/**
+	* @param str $formatStr format string as used by abstractModel::__toString() methods.
+	*                       in addition to other format options you can use %model that will be replaced
+	*                       with the default model::$__toString propertie.
+	*                       if left null then the default model::$__toString propertie will be used for rendering.
+	*/
+	public function __toString($formatStr=null){
+		$this->loadDatas();
+		if( null !==$formatStr )
+			$formatStr = preg_replace('!%model(?=\W|$)!',abstractModel::_getModelStaticProp($this->collectionType,'__toString'),$formatStr);
+		$o = '';
+		foreach($this as $m)
+			$o .= $m->__toString($formatStr);
+		return $o;
 	}
 }
 
@@ -1225,9 +1284,9 @@ abstract class abstractModel{
 		if( method_exists($this,"set$k") ){
 			return $this->{"set$k"}($this->bypassFilters?$v:$this->filterData($k,$v));
 		}
-		$this->needSave = 1;
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		if(isset($hasOne[$k])){
+			$this->needSave = 1; #- for now we change the needSave state will see later to check for unchanged values
 			$relModelName   = $hasOne[$k]['modelName'];
 			$thisPrimaryKey = self::_getModelStaticProp($this,'primaryKey');
 			$localField   = empty($hasOne[$k]['localField'])? $thisPrimaryKey : $hasOne[$k]['localField'];
@@ -1274,7 +1333,13 @@ abstract class abstractModel{
 		}*/
 
 		if(isset($this->datas[$k])){
-			return $this->datas[$k] = self::setModelDatasType($this,$k,$v);
+			$v = self::setModelDatasType($this,$k,$v);
+			if( $this->datas[$k] === $v ){
+				return $v;
+			}else{
+				$this->needSave = 1;
+				return $this->datas[$k] = $v;
+			}
 		}
 
 		throw new Exception(get_class($this)." trying to set unknown property $k.");
@@ -1295,7 +1360,7 @@ abstract class abstractModel{
 	* - get[_has*Name|Has*Name]() is shorthand for getRelated($has*Name) see getRelated() methods for more infos
 	* - get[_dataKey|DataKey]() return the corresponding value in this->datas
 	* - set[_dataKey|DataKey]($value,$bypassFilters=false,$leaveNeedSaveState=false) shortHand for _setData($dataKey,...) return this
-	* if none of above methods are found then it throw an exception
+	* if none of above methods are found then will throw an exception
 	*/
   public function __call($m,$a){
 		$className = get_class($this);
@@ -1381,10 +1446,13 @@ abstract class abstractModel{
 		$k = strtolower($k[0]).substr($k,1);
 		if( isset($datas[$k]) )
 			return $k;
-		#- last try to upper first char first
+		#- try to upper first char
 		$k = ucfirst($k);
 		if( isset($datas[$k]) )
 			return $k;
+		#- nothing worked we try a last check on primaryKey
+		if( $k==='PK')
+			return self::_getModelStaticProp($modelName,'primaryKey');
 		return false;
 	}
 
@@ -1897,8 +1965,8 @@ abstract class abstractModel{
 		$modelInstance = null;
 	}
 
-	function __toString(){
-		$format = self::_getModelStaticProp($this,'__toString');
+	function __toString($formatStr=null){
+		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
 		return preg_replace('!%('.self::$_internals[get_class($this)]['datasKeyExp'].')!e','$this->\\1',$format);
