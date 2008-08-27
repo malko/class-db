@@ -6,6 +6,9 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
+*                         - modelCollection::__call() now manage map[_]FieldName methods
+*                         - new abstractModel::getFilteredModelInstance() method
 *            - 2008-08-20 - now modelCollection::filterBy() support in,!in,IN,!IN operators for in_array comparisons
 *                         - modelCollection::(in|de)crement() now call modelCollection::loadDatas() first
 *                         - now setting model datas values will only change needSave state to 1 if set to a new value;
@@ -366,6 +369,11 @@ class modelCollection extends arrayObject{
 			else
 				$this->sort($dataKey,$sortType);
 			return $this;
+		}
+		#- map methods
+		if( preg_match("!^map_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
+			return $this->map($a[0],$dataKey);
 		}
 
 		#- try model methods if not callable by models then model will throw an exception and that's the expected behavior
@@ -1028,6 +1036,19 @@ abstract class abstractModel{
 		$PKs = $db->select_col($tableName,$primaryKey,$filter);
 		return self::getMultipleModelInstances($modelName,empty($PKs)?array():$PKs);
 	}
+	/**
+	* return single instance of modelName that match given filter
+	* @param string $modelName
+	* @param array  $filter    same as conds in class-db methods
+	* @return single abstractModel instance
+	*/
+	static public function getFilteredModelInstance($modelName,$filter=null){
+		$tableName  = self::_getModelStaticProp($modelName,'tableName');
+		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
+		$db = self::getModelDbAdapter($modelName);
+		$PK = $db->select_value($tableName,$primaryKey,$filter);
+		return self::getModelInstance($modelName,$PK);
+	}
 
 	/*
 	* return modelCollection of modelName where primaryKeys are returned by the SQL query.
@@ -1183,8 +1204,7 @@ abstract class abstractModel{
 			$localFieldVal = $this->datas[$relDef['localField']];
 			if( (! empty($relDef['foreignField'])) && $relDef['foreignField'] !== self::_getModelStaticProp($relDef['modelName'],'primaryKey') ){
 				# foreignKey is not primaryKey so we must get it throught filteredInstances
-				$tmpModel = self::getFilteredModelInstances($relDef['modelName'],array("WHERE $relDef[foreignField]=? LIMIT 0,1",$localFieldVal));
-				$tmpModel = $tmpModel->current();
+				$tmpModel = self::getFilteredModelInstance($relDef['modelName'],array("WHERE $relDef[foreignField]=? LIMIT 0,1",$localFieldVal));
 			}else{ # foreignKey is primaryKey
 				$tmpModel = self::getModelInstance($relDef['modelName'],$localFieldVal);
 			}
@@ -1600,7 +1620,8 @@ abstract class abstractModel{
 			$v = call_user_func($cb,$v);
 		}
 		if($v===$errorValue){
-			$this->appendFilterMsg($msg?$msg:"invalid value($v) given for $k");
+			$v = func_get_arg(1);
+			$this->appendFilterMsg($msg?$msg:"invalid value(%s) given for %s",array($v,$k));
 			return false;
 		}
 		return $v;
@@ -1616,7 +1637,7 @@ abstract class abstractModel{
 		if( isset($this->filtersDictionary) ){
 			$msg = langManager::msg($msg,$sprintfDatas,$this->filtersDictionary);
 		}elseif( null !== self::$dfltFiltersDictionary ){
-			$msg = langManager::lookUpMsg($msg,self::$dfltFiltersDictionary,$sprintfDatas);
+			$msg = langManager::msg($msg,$sprintfDatas,self::$dfltFiltersDictionary);
 		}elseif(! empty($sprintfDatas)){
 			array_unshift($sprintfDatas,$msg);
 			$msg = call_user_func_array('sprintf',$sprintfDatas);

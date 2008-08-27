@@ -7,6 +7,7 @@
 * @since 2007-10
 * @class modelGenerator
 * @changelog
+*            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
 *            - 2008-08-13 - add method proposition to access enum fields possible values
 *            - 2008-08-05 - add empty property __toString for model rendering as string
 *            - 2008-08-04 - add additional methods proposition for filtering enums fields
@@ -336,6 +337,9 @@ class BASE_$modelName extends abstractModel{
 	}
 	static public function getFilteredInstances(\$filter=null){
 		return abstractModel::getFilteredModelInstances('$modelName',\$filter);
+	}
+	static public function getFilteredInstance(\$filter=null){
+		return abstractModel::getFilteredModelInstance('$modelName',\$filter);
 	}
 	static public function getFilteredInstancesByField(\$field,\$filterType,\$args=null){
 		return abstractModel::getFilteredModelInstancesByField('$modelName',\$field,\$filterType,\$args);
