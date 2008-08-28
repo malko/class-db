@@ -371,7 +371,7 @@ class BASE_$modelName extends abstractModel{
 	*/
 	static public function __callstatic(\$m,\$a){
 		#- manage common filter getter
-		if(preg_match('!getBy('.implode('|',array_keys(self::\$datasDefs)).')((?:(?:Less|Greater)(?:Equal)?Than)|Between|(?:Not)?(?:Null|Equal|Like|In))!',\$m,\$match)){
+		if(preg_match('!getBy('.implode('|',array_keys(self::\$datasDefs)).')((?:(?:Less|Greater)(?:Equal)?Than)|Between|(?:Not)?(?:Null|Equal|Like|In))$!',\$m,\$match)){
 			return call_user_func('abstractModel::getFilteredModelInstancesByField','$modelName',\$match[1],\$match[2],\$a);
 		}
 	}

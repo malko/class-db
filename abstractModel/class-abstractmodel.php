@@ -6,6 +6,7 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-08-28 - modelCollection::filterBy() now work on related objects properties
 *            - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
 *                         - modelCollection::__call() now manage map[_]FieldName methods
 *                         - new abstractModel::getFilteredModelInstance() method
@@ -621,23 +622,30 @@ class modelCollection extends arrayObject{
 	*/
 	public function filterBy($propertyName,$exp,$comparisonOperator=null){
 		$filtered = array();
+		if( $this->count() < 1)
+			return new modelCollection($this->collectionType);
+		#- prepare comparisonDatas // will work for datasKeys and related objects
+		$comparisonDatas = array();
+		foreach($this as $k=>$m)
+			$comparisonDatas[$k] = $m->{$propertyName};
+
 		if( null===$comparisonOperator || '===' === $comparisonOperator){ #- strict comparison
-			foreach($this->{$propertyName} as $k=>$v){
+			foreach($comparisonDatas as $k=>$v){
 				if( $v === $exp)
 					$filtered[] = $this[$k];
 			}
 		}elseif( 'preg' === $comparisonOperator ){ #- preg match comparison
-			foreach($this->{$propertyName} as $k=>$v){
+			foreach($comparisonDatas as $k=>$v){
 				if( preg_match($exp,$v) )
 					$filtered[] = $this[$k];
 			}
 		}elseif( in_array($comparisonOperator,array('in','!in','IN','!IN')) ){ # in array comparison
 			$strict=$comparisonOperator[strlen($comparisonOperator)-1]==='N'?true:false;
 			$not   = $comparisonOperator[0]==='!'?'!':'';
-			foreach($this->{$propertyName} as $k=>$v)
+			foreach($comparisonDatas as $k=>$v)
 				eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
 		}else{ #- user defined comparison
-			foreach($this->{$propertyName} as $k=>$v)
+			foreach($comparisonDatas as $k=>$v)
 				eval('if( $v '.$comparisonOperator.' $exp) $filtered[] = $this[$k];');
 		}
 		return abstractModel::getMultipleModelInstances($this->collectionType,$filtered);
