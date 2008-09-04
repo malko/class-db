@@ -6,6 +6,16 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
+*                         - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
+*            - 2008-09-01 - new modelCollection::sum() and modelCollection::avg() methods
+*                         - modelCollection::__call() now manage (sum|avg)[_]PropertyName() methods
+*                         - __toString() now use heredoc syntax to permit only one call to eval by model idem for collections (small optimisation)
+*            - 2008-08-29 - new modelCollection::getPropertyList() method
+*                         - new modelCollection::getPropertiesList() method
+*                         - modelCollection::filterBy() and modelCollection::__get() now use modelCollection::getPropertyList()
+*                         - modelCollection::__call() now manage get[_]PropertyNameList() methods
+*                         - abstractModel::_cleanKey() now can check multiple keyType at once
 *            - 2008-08-28 - modelCollection::filterBy() now work on related objects properties
 *            - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
 *                         - modelCollection::__call() now manage map[_]FieldName methods
@@ -151,18 +161,9 @@ class modelCollection extends arrayObject{
 	private $_sortReversed = false;
 	private $_datasKeyExp  = '';
 
-	function __construct($collectionType=null,array $modelList=null){
+	public function __construct($collectionType=null,array $modelList=null){
 		if(empty($modelList))
 			$modelList = array();
-		# ensure primaryKey consistency
-		$list = array();
-		foreach($modelList as $v){
-			if($v instanceof $this->collectionType)
-				$list[$v->PK] = $v;
-			else
-				$list[$v] = $v;
-		}
-		parent::__construct($list,0,'modelCollectionIterator');
 		#- ~ parent::__construct($modelList,0,'modelCollectionIterator');
 		if(! is_null($collectionType) ){
 			$this->collectionType = $collectionType;
@@ -176,7 +177,36 @@ class modelCollection extends arrayObject{
 				$this->_datasKeyExp = implode('|',$datasKeys).'|PK';
 			}
 		}
+		# ensure primaryKey consistency
+		$list = array();
+		foreach($modelList as $v){
+			if($v instanceof $this->collectionType)
+				$list[$v->PK] = $v;
+			else
+				$list[$v] = $v;
+		}
+		parent::__construct($list,0,'modelCollectionIterator');
 	}
+
+	/**
+	* return a new modelCollection instance of the correct type
+	* @param string $modelCollection required modelname of the model we want to init a collection for
+	* @param array  $modelList       otpional list of model we want to put in the collection
+	*/
+	static public function init(){
+		$args = func_get_args();
+		if(! isset($args[0]) )
+			throw new Exception('modelCollection::init() missing required parameter collection type');
+		$collectionType = $args[0];
+		$modelList = isset($args[1])?$args[1]:null;
+
+		$collectionClassName = $collectionType.'Collection';
+		if( class_exists($collectionType) && class_exists($collectionClassName,false) )
+			return new $collectionClassName($modelList);
+		else
+			return new modelCollection('abstractModel',$modelList);
+	}
+
 	function getIterator(){
 		return new modelCollectionIterator($this);
 	}
@@ -273,34 +303,28 @@ class modelCollection extends arrayObject{
 		if($k==='collectionType')
 			return $this->collectionType;
 
-		#- we will need infos from all models so load them all at once.
-		$this->loadDatas();
-
 		#- check we are not in presence of hasOne related models in which case we return them in a modelCollection
 		$hasOne = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
 		if( isset($hasOne[$k]) ){
-			$c = new modelCollection($hasOne[$k]['modelName']);
-			foreach($this as $mk=>$m){
+			$c = modelCollection::init($hasOne[$k]['modelName']);
+			foreach($this->loadDatas() as $mk=>$m){
 				$c[] = $m->datas[$hasOne[$k]['localField']];
 			}
 			return $c;
-		}#- @todo miss case where there's no local field set (primaryKey ref on other table
-
-		//'relName'=> array('modelName'=>'modelName','relType'=>'ignored|dependOn|requireBy','foreignField'=>'fieldNameIfNotPrimaryKey'[,'localField'=>'fieldNameIfNotPrimaryKey']),";
-		//'relName'=> array('modelName'=>'modelName','linkTable'=>'tableName','linkLocalField'=>'fldName',''=>'linkForeignField'=>'fldName','relType'=>'ignored|dependOn|requireBy'),";
-
+		}
 		#- then check for hasMany related models in this case we use tmp modelCollection to get them all at once.
 		$hasMany = abstractModel::_getModelStaticProp($this->collectionType,'hasMany');
 		if( isset($hasMany[$k]) ){
 			$relDef = $hasMany[$k];
 			$c =array();
 			#- set empty collection for models whith related not already set
+			$this->loadDatas();
 			foreach($this as $m){
 				if(! $m->isRelatedSet($k))
-					$m->{'set'.$k.'Collection'}(new modelCollection($relDef['modelName']));
+					$m->{'set'.$k.'Collection'}(modelCollection::init($relDef['modelName']));
 			}
 			$db = abstractModel::getModelDbAdapter($relDef['modelName']);
-			$c = new modelCollection($relDef['modelName']);
+			$c = modelCollection::init($relDef['modelName']);
 			if(! empty($relDef['linkTable']) ){
 				$lField = $relDef['linkLocalField'];
 				$fField = $relDef['linkForeignField'];
@@ -321,15 +345,15 @@ class modelCollection extends arrayObject{
 			}
 			return $c;
 		}
+		#- return list of properties.
 		$res = array();
-		foreach($this as $mk=>$m){
+		foreach($this->loadDatas() as $mk=>$m)
 			$res[$mk] = $m->$k;
-		}
 		return $res;
 	}
 
 	/**
-	* set all models in collection property at once
+	* set all models property in collection at once
 	*/
 	function __set($k,$v){
 		$this->loadDatas();
@@ -338,16 +362,61 @@ class modelCollection extends arrayObject{
 				$m->$k = $v;
 		}
 	}
+
+	/**
+	* return a list of model properties in collection indexed by model primaryKeys
+	* @param string $propertyName can point on any property even related names.
+	* @return array
+	*/
+	function getPropertyList($propertyName){
+		if( $this->count() <1)
+			return array();
+		$hasOne = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
+		$hasMany = abstractModel::_getModelStaticProp($this->collectionType,'hasMany');
+		$res = array();
+		foreach($this->loadDatas(( isset($hasOne[$propertyName]) || isset($hasMany[$propertyName]) )?$propertyName:null) as $mk=>$m)
+			$res[$mk] = $m->$propertyName;
+		return $res;
+	}
+	/**
+	* return a list indexed by model primaryKeys of associative array with each model properties
+	* @param mixed $propertiesNames list of propery to get from
+	*/
+	function getPropertiesList($propertiesNames){
+		if( $this->count() <1)
+			return array();
+		$properties = is_array($propertiesNames)?$propertiesNames:preg_split('![,|;]!',$propertiesNames);
+		$loadDatas = array();
+		foreach($properties as $p){
+			if( abstractModel::_cleanKey($this->collectionType,'hasOne|hasMany',$p) )
+				$loadDatas[]=$p;
+		}
+		$res = array();
+		foreach($this->loadDatas(empty($loadDatas)?null:implode('|',$loadDatas)) as $mk => $m){
+			foreach($properties as $p)
+				$res[$mk][$p] = $m->$p;
+		}
+		return $res;
+	}
+
 	/**
 	* dynamic methods shorthands such as:
+	* - get[_]RelNameList()
 	* - (increment|decrement)[_]FieldName($step=1)
 	* - filterBy[_]FieldName($matchExp,$comparisonOperator=null)
 	* - sortBy[_]FieldName($sortType=null);
+	* - map[_]FieldName($callback)
 	* if none of the above was found then it will call model methods on all instances in the collection
 	* and return their results as an array indexed by instances primarykeys
 	* @return mixed
 	*/
 	function __call($m,$a){
+		#- get list methods
+		if( preg_match('!get_?([0-9a-zA-Z_]+?)List$!',$m,$match)){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'hasOne|hasMany|datas',$match[1]);
+			if( false!==$dataKey)
+				return $this->getPropertyList($dataKey);
+		}
 		# increments / decrements
 		if( preg_match("!^(de|in)crement_?($this->_datasKeyExp)$!",$m,$match) ){
 			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[2]);
@@ -375,6 +444,16 @@ class modelCollection extends arrayObject{
 		if( preg_match("!^map_?($this->_datasKeyExp)$!",$m,$match) ){
 			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
 			return $this->map($a[0],$dataKey);
+		}
+		#- sum methods
+		if( preg_match("!^sum_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
+			return $this->sum($dataKey);
+		}
+		#- avg methods
+		if( preg_match("!^avg_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
+			return $this->avg($dataKey,isset($a[0])?$a[0]:null);
 		}
 
 		#- try model methods if not callable by models then model will throw an exception and that's the expected behavior
@@ -623,11 +702,9 @@ class modelCollection extends arrayObject{
 	public function filterBy($propertyName,$exp,$comparisonOperator=null){
 		$filtered = array();
 		if( $this->count() < 1)
-			return new modelCollection($this->collectionType);
-		#- prepare comparisonDatas // will work for datasKeys and related objects
-		$comparisonDatas = array();
-		foreach($this as $k=>$m)
-			$comparisonDatas[$k] = $m->{$propertyName};
+			return modelCollection::init($this->collectionType);
+		#- prepare comparisonDatas
+		$comparisonDatas = $this->getPropertyList($propertyName);
 
 		if( null===$comparisonOperator || '===' === $comparisonOperator){ #- strict comparison
 			foreach($comparisonDatas as $k=>$v){
@@ -673,6 +750,28 @@ class modelCollection extends arrayObject{
 	}
 
 	/**
+	* return sum value of given property for all models in collection
+	* @param string $propertyName name of the property we want sum value
+	* @return mixed
+	*/
+	public function sum($propertyName){
+		return array_sum($this->getPropertyList($propertyName));
+	}
+	/**
+	* return average value for the given property for models in collection
+	* @param string $propertyName name of the property we want average value
+	* @param int    $decimal      optionnal number of decimal to keep (use native php round() function)
+	* @return float
+	*/
+	public function avg($propertyName,$decimal=null){
+		$ct = $this->count();
+		if( $ct < 1)
+			return 0;
+		$avg = $this->sum($propertyName) / $ct;
+		return null===$decimal?$avg : round($avg,(int)$decimal);
+	}
+
+	/**
 	* will clone all instances of models in collection, this can be used to apply some methods on collection
 	* without modifying real instances of models that live in the rest of the programm
 	* (example you can apply a modelCollection::map('strtoupper',$propertyName) for rendering purpose,
@@ -680,7 +779,7 @@ class modelCollection extends arrayObject{
 	*/
 	public function clonedCollection(){
 		$this->loadDatas();
-		$clone = new modelCollection($this->collectionType);
+		$clone = modelCollection::init($this->collectionType);
 		foreach($this as $k=>$v){
 			$clone[$k] = clone $v;
 		}
@@ -738,12 +837,14 @@ class modelCollection extends arrayObject{
 	*/
 	public function __toString($formatStr=null){
 		$this->loadDatas();
-		if( null !==$formatStr )
-			$formatStr = preg_replace('!%model(?=\W|$)!',abstractModel::_getModelStaticProp($this->collectionType,'__toString'),$formatStr);
-		$o = '';
-		foreach($this as $m)
-			$o .= $m->__toString($formatStr);
-		return $o;
+		$modelFormatStr = abstractModel::_getModelStaticProp($this->collectionType,'__toString');
+		$formatStr = null===$formatStr?$modelFormatStr:preg_replace('!%model(?=\W|$)!',$modelFormatStr,$formatStr);
+		$str = '';$i=0;
+		foreach($this as $m){
+			${'model'.++$i}=$m;
+			$str.= preg_replace('/(?<!%)%(?!%)([A-Za-z0-9_>-]+)/','$model'.$i.'->\\1',$formatStr);
+		}
+		return eval('return<<<__TOSTRING'."\n$str\n__TOSTRING;\n");
 	}
 }
 
@@ -865,7 +966,7 @@ abstract class abstractModel{
 			if( $compact === true ){
 				$res[$model] = array_keys($instances);
 			}else{
-				$res[$model] = new modelCollection($model,$instances);
+				$res[$model] = modelCollection::init($model,$instances);
 				$res[$model] = $res[$model]->{$compact};
 			}
 		}
@@ -1028,7 +1129,7 @@ abstract class abstractModel{
 	* @return modelCollection indexed by their primaryKeys
 	*/
 	static public function getMultipleModelInstances($modelName,array $PKs){
-		return new modelCollection($modelName,$PKs);
+		return modelCollection::init($modelName,$PKs);
 	}
 
 	/**
@@ -1113,7 +1214,7 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$db = self::getModelDbAdapter($modelName);
 		$rows = $db->select_rows($tableName,'*',$orderedBY);
-		$collection = new modelCollection($modelName);
+		$collection = modelCollection::init($modelName);
 		if( $rows ===false )
 			return $collection;
 		foreach($rows as $row)
@@ -1137,7 +1238,7 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$db = self::getModelDbAdapter($modelName);
 		$rows = $db->select_slice($tableName,'*',$filter,$pageId,$pageSize);
-		$collection = new modelCollection($modelName);
+		$collection = modelCollection::init($modelName);
 		if( $rows === false )
 			return array($collection,'',0);
 		list($rows,$nav,$total) = $rows;
@@ -1234,7 +1335,7 @@ abstract class abstractModel{
 				$relDef['localField'] = $lcPKField;
 			# if $this is a newly unsaved object it can't already have any existing related object relying on it's primaryKey so return an empty collection
 			if( $relDef['localField'] === $lcPKField && $this->isTemporary() )
-				return $this->_manyModels[$relName] = new modelCollection($relDef['modelName']);
+				return $this->_manyModels[$relName] = modelCollection::init($relDef['modelName']);
 
 			$localFieldVal = $this->datas[$relDef['localField']];
 			if( empty($relDef['linkTable']) ){
@@ -1274,6 +1375,11 @@ abstract class abstractModel{
 		#- first check primary key
 		if( $k === 'PK' )
 			return $this->datas[self::_getModelStaticProp($this,'primaryKey')];
+
+		#- if  user defined getter exists we just call it and return
+		if( method_exists($this,"get$k") )
+			return $this->{"get$k"}();
+
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		$hasMany = self::_getModelStaticProp($this,'hasMany');
 		#- then check related objects first
@@ -1297,9 +1403,8 @@ abstract class abstractModel{
 	* setter for datas and hasOne relations
 	*/
 	public function __set($k,$v){
-		if($k === 'PK' || $k === self::_getModelStaticProp($this,'primaryKey') ){
+		if($k === 'PK' || $k === self::_getModelStaticProp($this,'primaryKey') )
 			throw new Exception(get_class($this)." primaryKey can not be set by user.");
-		}
 
 		#- apply filters
 		if(! $this->bypassFilters){
@@ -1309,9 +1414,9 @@ abstract class abstractModel{
 		}
 
 		#- call user defined setter first
-		if( method_exists($this,"set$k") ){
-			return $this->{"set$k"}($this->bypassFilters?$v:$this->filterData($k,$v));
-		}
+		if( method_exists($this,"set$k") )
+			return $this->{"set$k"}($v);
+
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		if(isset($hasOne[$k])){
 			$this->needSave = 1; #- for now we change the needSave state will see later to check for unchanged values
@@ -1427,7 +1532,7 @@ abstract class abstractModel{
 				throw new Exception("$className::$m invalid count of parameters");
 			$collection = $a[0];
 			if(is_array($collection))
-				$collection = new modelCollection($relName,$collection);
+				$collection = modelCollection::init($relName,$collection);
 			elseif(! $collection instanceof modelCollection )
 				throw new Exception("$className::$m invalid parameter $collection given, modelCollection expected.");
 			$this->_manyModels[$relName] = $collection;
@@ -1460,11 +1565,18 @@ abstract class abstractModel{
 	###--- FILTER RELATED METHODS ---###
 	/**
 	* internal method to get exact keys on magic methods call such as getRelName
-	* @param string $keyType hasOne|hasMany|datas|datasDefs
+	* @param string $keyType one or many of hasOne|hasMany|datas|datasDefs
 	* @return string clean key or false if not find
-	* @private
 	*/
 	static public function _cleanKey($modelName,$keyType,$k){
+		if( strpos($keyType,'|') ){
+			$keyType=explode('|',$keyType);
+			foreach($keyType as $type){
+				if( false!==($key=self::_cleanKey($modelName,$type,$k)) )
+					return $key;
+			}
+			return false;
+		}
 		if( $keyType === 'datas')
 			$keyType = 'datasDefs';
 		$datas = self::_getModelStaticProp($modelName,$keyType);
@@ -1998,6 +2110,7 @@ abstract class abstractModel{
 		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
-		return preg_replace('!%('.self::$_internals[get_class($this)]['datasKeyExp'].')!e','$this->\\1',$format);
+		$string = preg_replace('/(?<!%)%(?!%)([A-Za-z0-9_>-]+)/','$this->\\1',$format);
+		return eval('return<<<__TOSTRING'."\n$string\n__TOSTRING;\n");
 	}
 }
