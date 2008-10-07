@@ -6,6 +6,7 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @changelog
+*            - 2008-10-07 - bug correction (typo error in getRelated methods)
 *            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
 *                         - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
 *            - 2008-09-01 - new modelCollection::sum() and modelCollection::avg() methods
@@ -617,6 +618,7 @@ class modelCollection extends arrayObject{
 	/**
 	* sort collection by given datas property name
 	* @param str $sortBy   property to use to sort the collection
+	* @param str $sortType type of comparison to use can be one of
 	*                      - null (default) will use std, natc or binc depending on property type (as defined in model::datasDefs[property])
 	*                      - std  use standard > or < comparison
 	*                      - nat  use natural order comparison case sensitive (strnatcmp)
@@ -1351,8 +1353,8 @@ abstract class abstractModel{
 						array("WHERE $relDef[linkLocalField]=?",$localFieldVal)
 					);
 				}else{
-					$relTable      = self::_getModelStaticProp($relDefs['modelName'],'tableName');
-					$relPrimaryKey = self::_getModelStaticProp($relDefs['modelName'],'primaryKey');
+					$relTable      = self::_getModelStaticProp($relDef['modelName'],'tableName');
+					$relPrimaryKey = self::_getModelStaticProp($relDef['modelName'],'primaryKey');
 					$PKs = $this->dbAdapter->select_col(
 						"$relDef[linkTable] LEFT JOIN $relTable ON $relDef[linkTable].$relDef[linkForeignField] = $relTable.$relPrimaryKey",
 						$relDef['linkForeignField'],
