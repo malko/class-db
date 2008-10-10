@@ -9,6 +9,7 @@
 *  - get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 *  - smart '?' on conditions strings
 * @changelog
+*            - 2008-10-10 - new static property $_default_verbosity to set default beverbose value of any further new db instance
 *            - 2008-07-30 - some minor changes in dbProfiler report representation and bug correction in colors
 *            - 2008-04-14 - add location of queries and some colors to dbProfiler
 *            - 2008-04-10 - new class dbprofiler
@@ -180,6 +181,10 @@ class db{
 	* 0 -> no output, 1-> only errors, 2-> only queries, 3-> queries + errors
 	*/
 	public $beverbose = 0;
+	/**
+	* set default beverbose value of any further new db instance
+	*/
+	static public $_default_verbosity = 0;
 
 	static public $autoconnect = TRUE;
 	/**
@@ -224,6 +229,8 @@ class db{
 		if(! class_exists($class) )
 			require (dirname(__file__)."/class-$class.php");
 		eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
+		if( self::_default_verbosity )
+			$instance = (int) self::_default_verbosity;
 		return self::$instances[$connectionStr] = $instance;
 	}
 
