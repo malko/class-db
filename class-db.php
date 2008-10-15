@@ -229,8 +229,8 @@ class db{
 		if(! class_exists($class) )
 			require (dirname(__file__)."/class-$class.php");
 		eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
-		if( self::_default_verbosity )
-			$instance = (int) self::_default_verbosity;
+		if( self::$_default_verbosity )
+			$instance = (int) self::$_default_verbosity;
 		return self::$instances[$connectionStr] = $instance;
 	}
 
