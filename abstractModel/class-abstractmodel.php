@@ -162,6 +162,13 @@ class modelCollection extends arrayObject{
 	private $_sortReversed = false;
 	private $_datasKeyExp  = '';
 
+	/**
+	* Don't use this method anymore, use modelCollection::init() instead.
+	* The only reason why this method is still public is that modelCollection is based on arrayObject
+	* and so the constructor must be public to permit error free inheritance.
+	* @see modelCollection::init()
+	* @private
+	*/
 	public function __construct($collectionType=null,array $modelList=null){
 		if(empty($modelList))
 			$modelList = array();
