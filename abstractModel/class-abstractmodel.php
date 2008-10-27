@@ -5,6 +5,11 @@
 * @author Jonathan Gotti <jgotti at jgotti dot org>
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog
 *            - 2008-10-07 - bug correction (typo error in getRelated methods)
 *            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])

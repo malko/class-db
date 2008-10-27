@@ -6,6 +6,11 @@
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @class modelGenerator
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog
 *            - 2008-09-04 - add extended modelCollection
 *            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
