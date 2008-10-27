@@ -8,6 +8,11 @@
 * @since 2006-04-16 first splitted version
 *  - get_field and list_fields have changed -> list_table_fields (list_fields indexed by name)
 *  - smart '?' on conditions strings
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog
 *            - 2008-10-10 - new static property $_default_verbosity to set default beverbose value of any further new db instance
 *            - 2008-07-30 - some minor changes in dbProfiler report representation and bug correction in colors

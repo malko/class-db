@@ -2,6 +2,11 @@
 <?php
 /**
 * Sqlite Admin tool
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog - 2008-03-20 - add the rehash command to refresh completion table
 *                         - add maxcolsize and maxcolwidth command
 *                         - bug correction that offer page navigation on agregation query (ie: select count(*) from...)

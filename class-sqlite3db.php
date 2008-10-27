@@ -6,8 +6,13 @@
 * @file
 * @since 2008-04
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
-* @changelog 
-*            - 2008-07-29 - suppress a bug to avoid some error while trying to destroy twice the same last_qres. 
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
+* @changelog
+*            - 2008-07-29 - suppress a bug to avoid some error while trying to destroy twice the same last_qres.
 * @todo add transactions support
 */
 

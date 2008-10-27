@@ -6,6 +6,11 @@
 * @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2004-11-26 first splitted version
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog
 *            - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
 *                           $setNamesOnSelectDb if both are null then nothing will happen else it will perform

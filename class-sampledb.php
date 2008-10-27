@@ -7,6 +7,11 @@
 * @class sampledb
 * @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 */
 
 /**

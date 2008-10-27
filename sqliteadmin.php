@@ -2,6 +2,11 @@
 <?php
 /**
 * Sqlite Admin tool
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog - 2007-10-03 - remove some warning errors
 *                         - add the whole last multiline command to history
 *                         - if no HISTSIZE value is found in $_SERVER then default to console_app::$historyMaxLen
@@ -118,7 +123,7 @@ while(TRUE){
       }
       $inserted = $inserterr = 0;
       foreach($res as $row){
-        if($protect) 
+        if($protect)
           $row = preg_replace(array("!\\$protect!","!$protect!",),array($protect),$row);
         if($db->insert($table,$row))
           $inserted++;
@@ -150,7 +155,7 @@ while(TRUE){
           $separator = trim($separator);
         }
         $protect  = trim(console_app::read("enter char to use to protect field values (dflt:$protect)",$protect));
-        # add headers 
+        # add headers
         if(console_app::msg_confirm("first row is field names",'')){
           array_unshift($res,array_keys($res[0]));
         }
@@ -241,7 +246,7 @@ tb,show tablename                 will list tables in the databases
 show tablename fields             will list fields in table tablename
 vacuum tablename                  optimize a table
 master                            display the content of SQLITE_MASTER
-SQL statements                    perform a query on the database such as 
+SQL statements                    perform a query on the database such as
                                   select, insert update or delete
 export tablename filename         export the given table as a csv file
 export SQL statements; filename   export the given query as csv to filename

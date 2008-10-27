@@ -5,6 +5,11 @@
 * @package class-db
 * @file
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
+* @svnInfos:
+*            - $LastChangedDate$
+*            - $LastChangedRevision$
+*            - $LastChangedBy$
+*            - $HeadURL$
 * @changelog
 *            - 2008-04-06 - no more $mode parameter to construct the database (not managed by the extension at all so drop it)
 *                         - drop php4 support, and buffered query are no longer supported (was useless as db has it's own buffer)
