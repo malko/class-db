@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
 *            - 2008-10-07 - bug correction (typo error in getRelated methods)
 *            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
 *                         - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
@@ -681,11 +682,16 @@ class modelCollection extends arrayObject{
 	* @private
 	* @see modelCollection::sort(), modelCollection::rsort()
 	*/
-	private function sortCompare($a,$b){
-		$a = $a->{$this->_sortBy};
-		$b = $b->{$this->_sortBy};
-		if($a == $b)
-			return 0;
+	private function sortCompare($_a,$_b){
+		$a = $_a->{$this->_sortBy};
+		$b = $_b->{$this->_sortBy};
+		if($a == $b){
+			#- rely on actual sorting position inside the collection
+			$keys = $this->keys();
+			$a = array_search($_a->PK,$keys,true);
+			$b = array_search($_b->PK,$keys,true);
+			return $a<$b?-1:1;
+		}
 		switch($this->_sortType){
 			case 'nat':  $res = strnatcmp($a,$b); break;
 			case 'natc': $res = strnatcasecmp($a,$b); break;
@@ -963,7 +969,7 @@ abstract class abstractModel{
 	/**
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
 	*/
-	static public $useDbProfiler = true;
+	static public $useDbProfiler = false;
 
 	/** formatString to display model as string */
 	static public $__toString = '';
