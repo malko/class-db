@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
 *            - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
 *            - 2008-10-07 - bug correction (typo error in getRelated methods)
 *            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
@@ -712,10 +713,11 @@ class modelCollection extends arrayObject{
 	* @param string $propertyName           the property on which you want to apply filter
 	* @param mixed  $exp                    the value the property must match
 	* @param string $comparisonOperator     comparison operator to use default is ===
-	*                                       some example of what can be use there: <, >, <=, >=, ==
+	*                                       some example of what can be use there: <, >, <=, >=, ==, !=, !==
 	*                                       - you can also use 'preg' to filter by using preg_match, in which case
 	*                                       $exp must be a valid PCRE regexp
-	*                                       - 'in' and '!in' can be used with an array as $exp to check that value is or not in_array $exp
+	*                                       - 'in' and '!in' can be used with an array (or modelCollection) as $exp
+	*                                       to check that properties are or not in_array/in_collection $exp
 	*                                       - 'IN' and '!IN' are like 'in' and '!in' but use a strict comparison
 	* return modelCollection a new modelCollection with only matching elements
 	*/
@@ -736,11 +738,16 @@ class modelCollection extends arrayObject{
 				if( preg_match($exp,$v) )
 					$filtered[] = $this[$k];
 			}
-		}elseif( in_array($comparisonOperator,array('in','!in','IN','!IN')) ){ # in array comparison
+		}elseif( in_array($comparisonOperator,array('in','!in','IN','!IN')) ){ # in array/collection comparison
 			$strict=$comparisonOperator[strlen($comparisonOperator)-1]==='N'?true:false;
 			$not   = $comparisonOperator[0]==='!'?'!':'';
-			foreach($comparisonDatas as $k=>$v)
-				eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
+			if( $exp instanceof modelCollection){
+				foreach($comparisonDatas as $k=>$v)
+					eval('if('.$not.' isset($exp[$v->PK]) ) $filtered[] = $this[$k];');
+			}else{
+				foreach($comparisonDatas as $k=>$v)
+					eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
+			}
 		}else{ #- user defined comparison
 			foreach($comparisonDatas as $k=>$v)
 				eval('if( $v '.$comparisonOperator.' $exp) $filtered[] = $this[$k];');
