@@ -11,7 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2008-11-27 - little modification in type detection 
+*            - 2008-11-27 - little modification in type detection
+*                         - new modelCollection::min[_?FieldName]([FieldName]) modelCollection::max[_?FieldName]([FieldName]) methods
 *            - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
 *            - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
 *            - 2008-10-07 - bug correction (typo error in getRelated methods)
@@ -471,6 +472,11 @@ class modelCollection extends arrayObject{
 			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[1]);
 			return $this->avg($dataKey,isset($a[0])?$a[0]:null);
 		}
+		#- min /max methods
+		if( preg_match("!^(max|min)_?($this->_datasKeyExp)$!",$m,$match) ){
+			$dataKey = abstractModel::_cleanKey($this->collectionType,'datas',$match[2]);
+			return $this->{$match[1]}($dataKey);
+		}
 
 		#- try model methods if not callable by models then model will throw an exception and that's the expected behavior
 		$res = array();
@@ -798,6 +804,23 @@ class modelCollection extends arrayObject{
 		$avg = $this->sum($propertyName) / $ct;
 		return null===$decimal?$avg : round($avg,(int)$decimal);
 	}
+	/**
+	* return max value of given property for all models in collection
+	* @param string $propertyName name of the property we want sum value
+	* @return mixed
+	*/
+	public function max($propertyName){
+		return $this->clonedCollection()->sort($propertyName)->last()->{$propertyName};
+	}
+	/**
+	* return min value of given property for all models in collection
+	* @param string $propertyName name of the property we want sum value
+	* @return mixed
+	*/
+	public function min($propertyName){
+		return $this->clonedCollection()->sort($propertyName)->first()->{$propertyName};
+	}
+
 
 	/**
 	* will clone all instances of models in collection, this can be used to apply some methods on collection
