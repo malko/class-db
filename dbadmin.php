@@ -51,7 +51,7 @@ $app->define_arg('verbose','v',1,'set level between 0 and 3 where 0 is no verbos
 
 if( function_exists('readline') ){
 	readline_completion_function('autocompletion');
-	$history_file = $_SERVER['HOME'].'/.sqliteadmin_hist';
+	$history_file = $_SERVER['HOME'].'/.dbadmin_hist';
 	readline_read_history($history_file);
 }
 
@@ -639,7 +639,8 @@ function save_history($history_file){
     console_app::msg_error("Can't write history file");
   }
   # nettoyage de l'historique
-  $hist = readline_list_history();
+  #$hist = readline_list_history();
+  $hist = file($history_file);
   $histMaxSize = isset($_SERVER['HISTSIZE'])?$_SERVER['HISTSIZE']:console_app::$historyMaxLen;
   if( ($histsize = count($hist)) > $histMaxSize ){
     $hist = array_slice($hist, $histsize - $histMaxSize);

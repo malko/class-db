@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-11-27 - little modification in type detection 
 *            - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
 *            - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
 *            - 2008-10-07 - bug correction (typo error in getRelated methods)
@@ -1719,9 +1720,9 @@ abstract class abstractModel{
 	* @return mixed value with the required type setted
 	*/
 	static protected function _setType(&$value,$typeStr){
-		if( preg_match('!int|timestamp!i',$typeStr))
+		if( preg_match('!^\s*(int|timestamp)!i',$typeStr))
 			$type = 'int';
-		elseif(preg_match('!float|real|double!i',$typeStr))
+		elseif(preg_match('!^\s*(float|real|double)!i',$typeStr))
 			$type = 'float';
 		else
 			$type = 'string';
