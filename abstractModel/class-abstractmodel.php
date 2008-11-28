@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-11-28 - bug correction in int type detection
+*                         - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
 *            - 2008-11-27 - little modification in type detection
 *                         - new modelCollection::min[_?FieldName]([FieldName]) modelCollection::max[_?FieldName]([FieldName]) methods
 *            - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
@@ -398,8 +400,9 @@ class modelCollection extends arrayObject{
 	/**
 	* return a list indexed by model primaryKeys of associative array with each model properties
 	* @param mixed $propertiesNames list of propery to get from
+	* @param string $concatSeparator if $concatSeparator is passed then will implode each model results using given string as separator
 	*/
-	function getPropertiesList($propertiesNames){
+	function getPropertiesList($propertiesNames,$concatSeparator=null){
 		if( $this->count() <1)
 			return array();
 		$properties = is_array($propertiesNames)?$propertiesNames:preg_split('![,|;]!',$propertiesNames);
@@ -409,10 +412,8 @@ class modelCollection extends arrayObject{
 				$loadDatas[]=$p;
 		}
 		$res = array();
-		foreach($this->loadDatas(empty($loadDatas)?null:implode('|',$loadDatas)) as $mk => $m){
-			foreach($properties as $p)
-				$res[$mk][$p] = $m->$p;
-		}
+		foreach($this->loadDatas(empty($loadDatas)?null:implode('|',$loadDatas)) as $mk => $m)
+			$res[$mk] = $m->_getProperties($properties,$concatSeparator);
 		return $res;
 	}
 
@@ -1421,6 +1422,19 @@ abstract class abstractModel{
 		return !(empty($this->_oneModels[$k]) && empty($this->_manyModels[$k]));
 	}
 
+	/**
+	* return an associative array with each properties
+	* @param mixed  $propertiesNames list of propery to get from can be an array
+	*                                or a string with properties separated by any of the following chars |,;
+	* @param string $concatSeparator if $concatSeparator is passed then will implode result using given string as separator
+	* @return array
+	*/
+	public function _getProperties($propertiesNames,$concatSeparator=null){
+		$properties = is_array($propertiesNames)?$propertiesNames:preg_split('![,|;]!',$propertiesNames);
+		foreach($properties as $p)
+			$res[$p] = $this->{$p};
+		return (null!==$concatSeparator)?implode($concatSeparator,$res):$res;
+	}
 	###--- MAGIC METHODS ---###
 	public function __get($k){
 		#- first check primary key
