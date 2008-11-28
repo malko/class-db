@@ -1743,9 +1743,9 @@ abstract class abstractModel{
 	* @return mixed value with the required type setted
 	*/
 	static protected function _setType(&$value,$typeStr){
-		if( preg_match('!^\s*(int|timestamp)!i',$typeStr))
+		if( preg_match('!^\s*((tiny|big|medium|small)?int|timestamp)!i',$typeStr))
 			$type = 'int';
-		elseif(preg_match('!^\s*(float|real|double)!i',$typeStr))
+		elseif(preg_match('!^\s*(float|real|double|decimal)!i',$typeStr))
 			$type = 'float';
 		else
 			$type = 'string';
