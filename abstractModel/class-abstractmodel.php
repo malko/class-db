@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 *            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
+*                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
 *            - 2008-11-28 - bug correction in int type detection
 *                         - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
 *            - 2008-11-27 - little modification in type detection
@@ -931,7 +932,7 @@ abstract class abstractModel{
 	* list of error messages returned by filters
 	*/
 	protected $filtersMsgs = array();
-	#- set this on true to bypass filters when required (modelCollection use at loadDatas() time)
+	#- set this on true to bypass filters and user defined setters when required (modelCollection use this at loadDatas() time)
 	public $bypassFilters = false;
 	/** specificly added for simpleMVC.
 	* this is meant to be the name of langManager dictionary where filtersMsgs will be looked for.
@@ -1146,7 +1147,7 @@ abstract class abstractModel{
 	* @param bool   $dontOverideIfExists this only make sense if you have the primaryKey field set in datas
 	*                                    in this case if true and a living instance (not checked in database but in loaded instances) is found then it will simply return the instance as found
 	*                                    else it will set instance datas to the one given. (can be of help to set multiple keys at once)
-	* @param bool   $bypassFilters       if true then will bypass datas filtering
+	* @param bool   $bypassFilters       if true then will bypass datas filtering and users setters
 	* @param bool   $leaveNeedSaveState  by default setting datas will set $this->needSave to 1, setting this parameter to true
 	*                                    will leave $this->needSave to its previous state (generally used by modelCollection::loadDatas()).
 	*/
@@ -1480,7 +1481,7 @@ abstract class abstractModel{
 		}
 
 		#- call user defined setter first
-		if( method_exists($this,"set$k") )
+		if( (! $this->bypassFilters) && method_exists($this,"set$k") )
 			return $this->{"set$k"}($v);
 
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
@@ -1666,7 +1667,7 @@ abstract class abstractModel{
 	* set multiples model datas values  at once from an array.
 	* @param array  $datas              array of key value pair of datas to set.
 	*                                   unknown keys or keys corresponding to primarykey will just be ignored.
-	* @param bool   $bypassFilters      if true then will bypass datas filtering but will restore $this->bypassFilters to it's previous state
+	* @param bool   $bypassFilters      if true then will bypass datas filtering and user defined setters but will restore $this->bypassFilters to it's previous state
 	* @param mixed  $forcedPrimaryKey   you should NEVER use this parameter outside abstractModel::__construct().
 	*                                   as it will break the self::instances key integrity!
 	*                                   in fact the only reason to use this at this time is to permit modelAddons to
@@ -1702,7 +1703,7 @@ abstract class abstractModel{
 	* same as _setDatas but for a unique data key.
 	* @param string $key    datas key to set
 	* @param mixed  $value  value to set (will be convert to correct type)
-	* @param bool   $bypassFilters      if true then will bypass datas filtering but will restore $this->bypassFilters to it's previous state
+	* @param bool   $bypassFilters      if true then will bypass datas filtering and user defined setters but will restore $this->bypassFilters to it's previous state
 	* @param bool   $leaveNeedSaveState by default setting datas will set $this->needSave to 1, setting this parameter to true
 	*                                   will leave $this->needSave to its previous state.
 	*
