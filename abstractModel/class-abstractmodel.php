@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
 *            - 2008-11-28 - bug correction in int type detection
 *                         - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
 *            - 2008-11-27 - little modification in type detection
@@ -1571,7 +1572,7 @@ abstract class abstractModel{
 		}
 
 		#- manage add methods for hasMany related
-		if(preg_match('!^append(_new|New)_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
+		if(preg_match('!^append(_new|New)?_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
 			$relName = self::_cleanKey($this,'hasMany',$match[2]);
 			if($relName===false)
 				throw new Exception("$className trying to call unknown method $m with no matching hasMany[$match[1]] definition.");
