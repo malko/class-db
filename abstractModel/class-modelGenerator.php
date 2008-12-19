@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys 
 *            - 2008-09-04 - add extended modelCollection
 *            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
 *            - 2008-08-13 - add method proposition to access enum fields possible values
@@ -239,6 +240,7 @@ class modelGenerator{
 
 		#- initVars
 		$methods = $datas = $datasTypes = $one2one = $one2many = $many2many = array();
+		$modelName = self::__prefix($tableName,$prefix);
 
 		if( is_null($dbConnectionDefined) )
 			$dbConnectionDefined = "'$this->connectionStr'";
@@ -266,6 +268,21 @@ class modelGenerator{
 		return array($vals);
 	}
 	";
+			}elseif(strpos($f['Key'],'UNI')===0){
+				$ucFirst = ucFirst($f['Field']);
+				$methods[] = "
+	static public function check".$ucFirst."Exists(\$v,\$returnInstance=false,\$ignoredPK=null){
+		return self::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v, \$returnInstance, \$ignoredPK);
+	}
+	public function filter".$ucFirst."(\$val){
+		\$exists = $modelName::check".$ucFirst."Exists(\$val,false,\$this->isTemporary()?null:\$this->PK);
+		if( \$exists ){
+			\$this->appendFilterMsg(\"can't set $f[Field] to an already used value: \$val\");
+			return false;
+		}
+		return \$val;
+	}
+				";
 			}
 		}
 
@@ -292,7 +309,6 @@ class modelGenerator{
 			}
 		}
 
-		$modelName = self::__prefix($tableName,$prefix);
 
 		$str = "<?php
 /**

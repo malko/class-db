@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
 *            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
 *                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
 *            - 2008-11-28 - bug correction in int type detection
@@ -1850,6 +1851,31 @@ abstract class abstractModel{
 		return $msgs;
 	}
 
+	/**
+	* 
+	* @param string $modelName name of model to check for existing datas
+	* @param string $fieldName name of the field we want to make the check on
+	* @param mixed  $value     value we want to check for existance
+	* @param bool   $returnInstance[optional] whether to return a bool or a modelInstance
+	* @param mixed  $ignoredPK[optional] instances PK to ignore (may be one PK a list of PK or a modelCollection with ignored elements in it)
+	* @return bool or abstractModel instance depending on $returnInstance 
+	*/
+	static public function modelCheckFieldDatasExists($modelName,$fieldName,$value,$returnInstance=false,$ignoredPK=null){
+		$db = self::getModelDbAdapter($modelName);
+		$w = array("WHERE $fieldName = ?",$value);
+		if($ignoredPK!==null){
+			if( $ignoredPK instanceof modelCollection)
+				$ignoredPK = $ignoredPK->PK;
+			if( is_array($ignoredPK))
+				$w = array("WHERE $fieldName = ? AND ".self::_getModelStaticProp($modelName, 'primaryKey').' NOT IN (?)',$value,$ignoredPK );
+			else
+				$w = array("WHERE $fieldName = ? AND ".self::_getModelStaticProp($modelName, 'primaryKey').' != ?',$value,$ignoredPK );
+		}
+		$PK = $db->select_value(self::_getModelStaticProp($modelName, 'tableName'),self::_getModelStaticProp($modelName, 'primaryKey'),$w);
+		if( $PK===false)
+			return $returnInstance?null:false;
+		return $returnInstance? self::getModelInstance($modelName, $PK):true;
+	} 
 	###--- SOME WAY TO DEAL WITH THE MISSING STATIC LATE BINDING (will probably change with PHP >= 5.3 ---###
 	/**
 	* quick and dirty "hack" to permit access to static methods and property of models
