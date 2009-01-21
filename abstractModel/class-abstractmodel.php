@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 *            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
+*                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())  
 *            - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
 *            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
 *                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
@@ -1060,6 +1061,7 @@ abstract class abstractModel{
 			$datasDefs = self::_getModelStaticProp($this,'datasDefs');
 			foreach(array_keys($datasDefs) as $k)
 				$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
+			$datasKeys[] = 'PK';
 			self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
 		}
 
