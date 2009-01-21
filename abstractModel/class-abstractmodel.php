@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
 *            - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
 *            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
 *                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
@@ -793,6 +794,8 @@ class modelCollection extends arrayObject{
 	* @return mixed
 	*/
 	public function sum($propertyName){
+		if( $this->count() < 1)
+			return 0;
 		return array_sum($this->getPropertyList($propertyName));
 	}
 	/**
@@ -814,6 +817,8 @@ class modelCollection extends arrayObject{
 	* @return mixed
 	*/
 	public function max($propertyName){
+		if( $this->count() < 1)
+			return 0;
 		return $this->clonedCollection()->sort($propertyName)->last()->{$propertyName};
 	}
 	/**
@@ -822,6 +827,8 @@ class modelCollection extends arrayObject{
 	* @return mixed
 	*/
 	public function min($propertyName){
+		if( $this->count() < 1)
+			return 0;
 		return $this->clonedCollection()->sort($propertyName)->first()->{$propertyName};
 	}
 
@@ -1852,13 +1859,13 @@ abstract class abstractModel{
 	}
 
 	/**
-	* 
+	*
 	* @param string $modelName name of model to check for existing datas
 	* @param string $fieldName name of the field we want to make the check on
 	* @param mixed  $value     value we want to check for existance
 	* @param bool   $returnInstance[optional] whether to return a bool or a modelInstance
 	* @param mixed  $ignoredPK[optional] instances PK to ignore (may be one PK a list of PK or a modelCollection with ignored elements in it)
-	* @return bool or abstractModel instance depending on $returnInstance 
+	* @return bool or abstractModel instance depending on $returnInstance
 	*/
 	static public function modelCheckFieldDatasExists($modelName,$fieldName,$value,$returnInstance=false,$ignoredPK=null){
 		$db = self::getModelDbAdapter($modelName);
@@ -1875,7 +1882,7 @@ abstract class abstractModel{
 		if( $PK===false)
 			return $returnInstance?null:false;
 		return $returnInstance? self::getModelInstance($modelName, $PK):true;
-	} 
+	}
 	###--- SOME WAY TO DEAL WITH THE MISSING STATIC LATE BINDING (will probably change with PHP >= 5.3 ---###
 	/**
 	* quick and dirty "hack" to permit access to static methods and property of models
