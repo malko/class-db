@@ -11,8 +11,13 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
 *            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
 *                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())  
+*            - 2009-01-15 - new abstractModel static property $_avoidEmptyPK that when setted to true will return make getInstance to work as getNew when called with an empty PK
+*                         - add abstractModel::__get() accessors to 'dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK' static properties
+*                         - modelCollection::__get() now check $_avoidEmptyPK when accessing models properties
+*                         - new modelCollection methods getTemporaries() and removeTemporaries()
 *            - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
 *            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
 *                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
@@ -279,6 +284,30 @@ class modelCollection extends arrayObject{
 		unset($this[$model]);
 		return true;
 	}
+	/**
+	* remove temporary models in collection.
+	* @param  bool $chaining if true then return $this collection instead of removed models collection.
+	* @return modelCollection return a collection of removed nodes or $this if $chaining is true
+	*
+	*/
+	function removeTemporaries($chaining=false){
+		if(! $this->count() )
+			return $chaining?$this:self::init($this->collectionType);
+		$temps = $this->getTemporaries();
+		$this->remove($temps);
+		return $chaining?$this:$temps;
+	}
+	/**
+	* return new modelCollection of temporaries instance living inside current collection.
+	* @return modelCollection
+	*/
+	function getTemporaries(){
+		if(! $this->count() )
+			return self::init($this->collectionType);
+		$temps = array_keys(array_filter($this->isTemporary()));
+		return self::init($this->collectionType,$temps);
+	}
+
 
 	function offsetSet($index,$value){
 		if(! $value instanceof $this->collectionType ){
@@ -331,8 +360,9 @@ class modelCollection extends arrayObject{
 		$hasOne = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
 		if( isset($hasOne[$k]) ){
 			$c = modelCollection::init($hasOne[$k]['modelName']);
+			$avoidEmptyPK = abstractModel::_getModelStaticProp($c->collectionType,'_avoidEmptyPK');
 			foreach($this->loadDatas() as $mk=>$m){
-				$c[] = $m->datas[$hasOne[$k]['localField']];
+				$c[] = ($avoidEmptyPK && empty($m->datas[$hasOne[$k]['localField']]))?$m->{$k}:$m->datas[$hasOne[$k]['localField']];
 			}
 			return $c;
 		}
@@ -586,7 +616,8 @@ class modelCollection extends arrayObject{
 	/** return first model in collection @return abstractModel or null */
 	function first(){
 		if( count($this) < 1) return null;
-		$m = current($this->getArrayCopy());
+		$m = reset($this);
+		//$m = current($this->getArrayCopy());
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
@@ -1018,6 +1049,11 @@ abstract class abstractModel{
 	static public $__toString = '';
 
 	/**
+	* if true then the model can't have an empty primaryKey value (empty as in php empty() function)
+	* so passing an empty PrimaryKey at getInstance time will result to be equal to a getNew call
+	*/
+	static protected $_avoidEmptyPK = false;
+	/**
 	* only for debug purpose
 	* @todo delete this debug method
 	*/
@@ -1040,10 +1076,11 @@ abstract class abstractModel{
 	* @param str  $PK       if given retrieve the datas for the given primary key object.
 	*                       else return a new empty model object.
 	* @param bool $isDummyInstance this is only there for internal purpose (such as call to getModelDbAdapter method)
-	* @param bool $fullLoad if true then will load all related object at construction time.
-	*
 	*/
 	protected function __construct($PK=null,$isDummyInstance=false){
+		if( $this->_avoidEmptyPK && empty($PK) )
+			$PK = null;
+
 		#- first set some internalDatas for easier further access
 		if( empty(self::$_internals[get_class($this)]) ){
 			$oneKeys = $manyKeys = $datasKeys = array();
@@ -1083,7 +1120,7 @@ abstract class abstractModel{
 				$_addon = new $addonClass($this,$PK);
 				$this->_modelAddons[$addon] = $_addon;
 			}
-			#- check addons haven't already set datas y checking primary key
+			#- check addons haven't already set datas by checking primary key
 			if( $PK !== null){
 				self::setModelDatasType($this,$primaryKey,$this->datas[$primaryKey]);
 				if( $this->datas[$primaryKey] === $PK ) #- considering that datas has been setted by addons
@@ -1435,6 +1472,25 @@ abstract class abstractModel{
 	}
 
 	/**
+	* check if a method is supported by current instance of the object (also check if modelAddon overload the method
+	* @param string $methodName
+	* @param bool   $returnCallable if set to true return callable instead of bool
+	* @return bool or callable depending on $returnCallable value
+	* @see call_user_func for callable definition
+	*/
+	public function _methodExists($methodName,$returnCallable=false){
+		#- first check for modelAddons overloaded methods
+		foreach($this->_modelAddons as $addon){
+			if( $addon->isModelMethodOverloaded($methodName) )
+				return $returnCallable?array($addon,$methodName):true;
+		}
+		#- then check inside the instance
+		if( method_exists($this,$methodName) )
+			return $returnCallable?array($this,$methodName):true;
+
+		return false;
+	}
+	/**
 	* return an associative array with each properties
 	* @param mixed  $propertiesNames list of propery to get from can be an array
 	*                                or a string with properties separated by any of the following chars |,;
@@ -1454,7 +1510,7 @@ abstract class abstractModel{
 			return $this->datas[self::_getModelStaticProp($this,'primaryKey')];
 
 		#- if  user defined getter exists we just call it and return
-		if( method_exists($this,"get$k") )
+		if( $this->_methodExists("get$k") )
 			return $this->{"get$k"}();
 
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
@@ -1470,7 +1526,7 @@ abstract class abstractModel{
 		if( isset($this->$k) )
 			return $this->$k;
 		#- finally common static properties
-		if( in_array($k,array('modelName','tableName','primaryKey','datasDefs','hasOne','hasMany','filters'),1) )
+		if( in_array($k,array('modelName','tableName','primaryKey','datasDefs','hasOne','hasMany','filters','dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK'),1) )
 			return self::_getModelStaticProp($this,$k);
 		#- nothing left throw an exception
 		throw new Exception(get_class($this)."::$k unknown property.");
@@ -1491,7 +1547,7 @@ abstract class abstractModel{
 		}
 
 		#- call user defined setter first
-		if( (! $this->bypassFilters) && method_exists($this,"set$k") )
+		if( (! $this->bypassFilters) && $this->_methodExists("set$k") )
 			return $this->{"set$k"}($v);
 
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
@@ -1792,14 +1848,8 @@ abstract class abstractModel{
 		if( empty($filters[$k]) ){
 			$filterName = "filter$k";
 			#- first look inside model for a filterMethod
-			if( method_exists($this,$filterName) )
+			if( $this->_methodExists($filterName) )
 				return $this->{$filterName}($v);
-			#- if no filtering methods was found in model check if anAddon have such methods
-			foreach($this->_modelAddons as $addon){
-				if( $addon->isModelMethodOverloaded($filterName) ){
-					return call_user_func_array(array($addon,$filterName),array($v));
-				}
-			}
 			#- if no filtering methods was found at all then just return value
 			return $v;
 		}
@@ -1983,7 +2033,7 @@ abstract class abstractModel{
 		# exit if already in saving state
 		if( $needSave < 0 )
 			return $this;
-		if( method_exists($this,'onBeforeSave') ){
+		if( $this->_methodExists('onBeforeSave') ){
 			$PK = $this->PK;
 			$res = $this->onBeforeSave();
 			if( $PK !== $this->PK)
@@ -2059,7 +2109,7 @@ abstract class abstractModel{
 					throw new Exception(get_class($this)." Error while updating (PK=$PK).");
 			}else{ # insert
 				# check for user define primaryKey generation
-				if(! method_exists($this,'_newPrimaryKey') ){ # database manage key generation (autoincrement)
+				if(! $this->_methodExists('_newPrimaryKey') ){ # database manage key generation (autoincrement)
 					$this->datas[$primaryKey] = $this->dbAdapter->insert($tableName,$datas);
 					if( $this->datas[$primaryKey] === false )
 						throw new Exception(get_class($this)." Error while saving (PK=$PK).");
