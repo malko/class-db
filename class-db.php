@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-02-06 - add css class dbMsg to verbose messages
 *            - 2008-10-10 - new static property $_default_verbosity to set default beverbose value of any further new db instance
 *            - 2008-07-30 - some minor changes in dbProfiler report representation and bug correction in colors
 *            - 2008-04-14 - add location of queries and some colors to dbProfiler
@@ -764,11 +765,11 @@ class db{
 			if($isError){
 				if($useConsoleApp)
 					return console_app::msg_error($msg);
-				echo "<b style=\"color:red;\">[ERROR] $msg</b><br />\n";
+				echo "<b style=\"color:red;\" class=\"dbMsg\">[ERROR] $msg</b><br />\n";
 			}else{
 				if($useConsoleApp)
 					return console_app::msg_info($msg);
-				echo "<b style=\"color:blue;\">$msg</b><br />\n";
+				echo "<b style=\"color:blue;\" class=\"dbMsg\">$msg</b><br />\n";
 			}
 		}
 	}
