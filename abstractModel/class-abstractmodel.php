@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
 *            - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
 *            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
 *                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())  
@@ -2020,6 +2021,14 @@ abstract class abstractModel{
 	* @private
 	* protected function onBeforeSave(){}
 	*/
+	/**
+	* Optionnal method onBeforeDelete to let user define any action to take before the delete to start
+	* If return true then abort the delete process without any warning in the delete method.
+	* So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own.
+	* If the method return true it MUST set $this->deleted to true and call $this->detach() method if required.
+	* @private
+	* protected function onBeforeDelete(){}
+	*/
 
 
 	/**
@@ -2159,6 +2168,11 @@ abstract class abstractModel{
 			throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
 		if($this->needSave < 0)
 			return $this;
+		if( $this->_methodExists('onBeforeDelete') ){
+			$res = $this->onBeforeDelete();
+			if( true === $res )
+				return;
+		}
 		$this->needSave = -1;
 		#- check one related objects
 		foreach(self::_getModelStaticProp($this,'hasOne') as $relName=>$relDef){
