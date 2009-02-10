@@ -12,6 +12,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-02-09 - add new BASE_models static methods _GetSupportedAddons _SupportsAddon
+*                         - add $_avoidEmptyPK property to final models
 *            - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys 
 *            - 2008-09-04 - add extended modelCollection
 *            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
@@ -378,7 +380,12 @@ class BASE_$modelName extends abstractModel{
 	static public function _setPagedNav(\$sliceAttrs){
 		return abstractModel::_setModelPagedNav('$modelName',\$sliceAttrs);
 	}
-
+	static public function _getSupportedAddons(){
+		return abstractModel::_modelGetSupportedAddons('$modelName');
+	}
+	static public function _supportsAddon(\$modelAddon,\$caseInsensitive=false){
+		return abstractModel::_modelGetSupportedAddons('$modelName',\$modelAddon,\$caseInsensitive);
+	}
 	static public function getCount(\$filter=null){
 		return abstractModel::getModelCount('$modelName',\$filter);
 	}
@@ -448,7 +455,12 @@ class $modelName extends BASE_$modelName{
 	static public \$__toString = '';
 
 	/** names of modelAddons this model can manage */
-	static protected \$modelAddons = array();"
+	static protected \$modelAddons = array();
+	/**
+	* if true then the model can't have an empty primaryKey value (empty as in php empty() function)
+	* so passing an empty PrimaryKey at getInstance time will result to be equal to a getNew call
+	*/
+	static protected \$_avoidEmptyPK = false;"
 	.(empty($methods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$methods)).
 	"
 }

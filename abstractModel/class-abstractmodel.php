@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-02-09 - new abstractModel statics methods _modelGetSupportedAddons() _modelSupportsAddon()
+*                         - new abstractModel::supportsAddon() method
 *            - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
 *            - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
 *            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
@@ -1940,6 +1942,8 @@ abstract class abstractModel{
 	/**
 	* quick and dirty "hack" to permit access to static methods and property of models
 	* waiting for php >= 5.3 late static binding implementation
+	* @param mixed $modelName string modelName or model Instance
+	* @return mixed depending on the requested property
 	*/
 	static public function _getModelStaticProp($modelName,$staticProperty){
 		if( is_object($modelName) )
@@ -1990,6 +1994,45 @@ abstract class abstractModel{
 			return $returnDef?array('hasOne'=>$hasOne,'hasMany'=>$hasMany):false;
 		if($relType === null)
 			return $returnDef?array('hasOne'=>$hasOne,'hasMany'=>$hasMany):true;
+	}
+
+	/**
+	* return a list of supported modelAddons
+	* @param mixed $modelName string modelName or model Instance
+	* @return array;
+	*/
+	static public function _modelGetSupportedAddons($modelName){
+		return self::_getModelStaticProp($modelName,'modelAddons');
+	}
+	/**
+	* check if a model support given modelAddon.
+	* @param mixed $modelName       string modelName or model Instance
+	* @param mixed $modelAddon      string modelAddonName or modelAddon Instance
+	* @param bool  $caseInsensitive by default lookup is done in a case sensitive way, setting this to true will do it in a case insensitive way.
+	* @return bool
+	*/
+	static public function _modelSupportsAddon($modelName,$modelAddon,$caseInsensitive=false){
+		$supported = self::_modelGetSupportedAddons($modelName);
+		if( is_object($modelAddon) )
+			$modelAddon = get_class($modelAddon);
+		$modelAddon = preg_replace('!_?[mM]odelAddon$!','',$modelAddon);
+		if( $caseInsensitive ){
+			$modelAddon = strtolower($modelAddon);
+			$supported = array_map('strtolower',$supported);
+		}
+		return in_array($modelAddon,$supported,true);
+	}
+	/**
+	* check that current instance supports given modelAddon.
+	* @param mixed $modelAddon  string modelAddonName or modelAddon Instance
+	* @param bool  $returnAddon set true to return modelAddon instance instead of true on success and null instead of false on fail
+	* @return mixed bool or modelAddon depend on $returnAddon parameter
+	*/
+	public function supportsAddon($modelAddon,$returnAddon = false){
+		if( isset($this->_modelAddons[$modelAddon]) ){
+			return $returnAddon?$this->_modelAddons[$modelAddon]:true;
+		}
+		return false;
 	}
 
 	###--- COMMON METHODS ---###
