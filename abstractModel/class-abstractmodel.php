@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-03-13 - now __toString methods can render expression like %{expression}%
 *            - 2009-02-09 - new abstractModel statics methods _modelGetSupportedAddons() _modelSupportsAddon()
 *                         - new abstractModel::supportsAddon() method
 *            - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
@@ -929,8 +930,9 @@ class modelCollection extends arrayObject{
 	/**
 	* @param str $formatStr format string as used by abstractModel::__toString() methods.
 	*                       in addition to other format options you can use %model that will be replaced
-	*                       with the default model::$__toString propertie.
-	*                       if left null then the default model::$__toString propertie will be used for rendering.
+	*                       with the default model::$__toString property.
+	*                       if left null then the default model::$__toString property will be used for rendering.
+	* @see abstractModel::__toString() for more infos
 	*/
 	public function __toString($formatStr=null){
 		$this->loadDatas();
@@ -939,8 +941,10 @@ class modelCollection extends arrayObject{
 		$str = '';$i=0;
 		foreach($this as $m){
 			${'model'.++$i}=$m;
-			$str.= preg_replace('/(?<!%)%(?!%)([A-Za-z0-9_>-]+)/','$model'.$i.'->\\1',$formatStr);
+			$str.= preg_replace('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','$model'.$i.'->\\1',$formatStr);
 		}
+		$str_=$str;
+		$str = preg_replace(array('/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array("\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$str);
 		return eval('return<<<__TOSTRING'."\n$str\n__TOSTRING;\n");
 	}
 }
@@ -2315,11 +2319,24 @@ abstract class abstractModel{
 		$modelInstance = null;
 	}
 
+	/**
+	* Render the model as string. If no abstractModel::$__toString property is defined a generic string will be rendered identifying the tyme and key of the model.
+	* You can set the way the model will be rendered as a string by passing a $formatStr as first parameter.
+	* If $formatStr is null then the method will look for a default abstractModel::$__toString property as a default formatStr to use.
+	* @param string $formatStr format string to use to render the model as a string.
+	*                          the generic syntax of this string is the same as HEREDOC syntax.
+	*                          Additionnaly you can refer to any model properties as %propertyName
+	*                          or even do some expression evaluation using the syntax %{expression}%
+	*                          for example: "%modelName(%PK) is a %{preg_match('!tmp!',%PK)?'temporary instance':'database instance'}%"
+	*                          will return something like this: "modelName(1) is a database instance"
+	*                          to display a litteral '%' character please just double it like '%%'
+	* @return string
+	*/
 	function __toString($formatStr=null){
 		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
-		$string = preg_replace('/(?<!%)%(?!%)([A-Za-z0-9_>-]+)/','$this->\\1',$format);
+		$string = preg_replace(array('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
 		return eval('return<<<__TOSTRING'."\n$string\n__TOSTRING;\n");
 	}
 }
