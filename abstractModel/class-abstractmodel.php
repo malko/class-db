@@ -1527,7 +1527,6 @@ abstract class abstractModel{
 		#- then check related objects first
 		if( isset($hasOne[$k]) || isset($hasMany[$k]) )
 			return $this->getRelated($k);
-
 		#- then check for datas values
 		if( isset($this->datas[$k]) )
 				return $this->datas[$k];
@@ -1592,7 +1591,7 @@ abstract class abstractModel{
 			if( isset($this->_oneModels[$k])){
 				unset($this->_oneModels[$k]); //-- sort of way to empty the cached related object, next call to get the related will dynamicly reload the related if required
 			}
-			return $this->{$k};
+			return $v;
 		}
 
 		#- ~ $hasMany = self::_getModelStaticProp($this,'hasMany');
