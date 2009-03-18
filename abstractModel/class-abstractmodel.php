@@ -11,13 +11,15 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-03-17 - now abstractmodel::_setDatas() use directly the __set() method to permit call to _setDatas inside user defined setter.
+*                         - now setting a hasOne relation by primaryKey using __set (so most of common setter methods) will drop any previously loaded related object to ensure data integrity
 *            - 2009-03-13 - now __toString methods can render expression like %{expression}%
 *            - 2009-02-09 - new abstractModel statics methods _modelGetSupportedAddons() _modelSupportsAddon()
 *                         - new abstractModel::supportsAddon() method
 *            - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
 *            - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
 *            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
-*                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())  
+*                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())
 *            - 2009-01-15 - new abstractModel static property $_avoidEmptyPK that when setted to true will return make getInstance to work as getNew when called with an empty PK
 *                         - add abstractModel::__get() accessors to 'dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK' static properties
 *                         - modelCollection::__get() now check $_avoidEmptyPK when accessing models properties
@@ -1576,7 +1578,7 @@ abstract class abstractModel{
 			switch( $hasOne[$k]['relType']){
 				case 'dependOn': #- check for data integrity REQUIRED so if we must check in database load the model at this time
 					if($this->bypassFilters || self::existsModelPK($relModelName,$v))
-						return $this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
+						$this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					else
 						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
 					break;
@@ -1584,9 +1586,13 @@ abstract class abstractModel{
 				case 'ignored':    #- at least if datas are really invalid it will trigger a databse error at save time
 					if($localField===$thisPrimaryKey)
 						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
-					return $this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
+					$this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					break;
 			}
+			if( isset($this->_oneModels[$k])){
+				unset($this->_oneModels[$k]); //-- sort of way to empty the cached related object, next call to get the related will dynamicly reload the related if required
+			}
+			return $this->{$k};
 		}
 
 		#- ~ $hasMany = self::_getModelStaticProp($this,'hasMany');
@@ -1789,7 +1795,7 @@ abstract class abstractModel{
 		if($bypassFilters)
 			$this->bypassFilters=true;
 
-		$this->$key = self::setModelDatasType($this,$key,$value);
+		$this->__set($key,self::setModelDatasType($this,$key,$value));
 
 		$this->bypassFilters = $filterState;
 		if(false !== $leaveNeedSaveState )
@@ -1821,7 +1827,7 @@ abstract class abstractModel{
 		if($value===null)
 			return null;
 		$datasDefs = self::_getModelStaticProp($modelName,'datasDefs');
-		if(! isset($key) )
+		if(! isset($datasDefs[$key]) )
 			throw new exception((is_object($modelName)?get_class($modelName):$modelName)."::setModelDatasType() $key is not a valid datas key.");
 		return self::_setType($value,$datasDefs[$key]['Type']);
 	}
