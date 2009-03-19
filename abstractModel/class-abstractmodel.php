@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-03-18 - modelCollection::__toString() take second parameter $separator again
+*                         - rewrite abstractmodel constructor, getModelInstance, getModelInstanceFromDatas to properly pass primaryKey value to modelAddons constructors (ie: when initialising collection).
 *            - 2009-03-17 - now abstractmodel::_setDatas() use directly the __set() method to permit call to _setDatas inside user defined setter.
 *                         - now setting a hasOne relation by primaryKey using __set (so most of common setter methods) will drop any previously loaded related object to ensure data integrity
 *            - 2009-03-13 - now __toString methods can render expression like %{expression}%
@@ -565,12 +567,13 @@ class modelCollection extends arrayObject{
 				continue;
 			}
 			$modelLoaded = abstractModel::isLivingModelInstance($this->collectionType,$v,true);
-			if(false===$modelLoaded){
+			if(! $modelLoaded instanceof $this->collectionType){
 				$needLoad[] = $v;
 			}else{
-				if(! $modelLoaded->deleted)#- drop deleted models
+				if( $modelLoaded->deleted)#- drop deleted models
 					unset($this[$v]);
-				$this[$v] = $modelLoaded;
+				else
+					$this[$v] = $modelLoaded;
 			}
 		}
 		if(! empty($needLoad) ){
@@ -934,18 +937,19 @@ class modelCollection extends arrayObject{
 	*                       in addition to other format options you can use %model that will be replaced
 	*                       with the default model::$__toString property.
 	*                       if left null then the default model::$__toString property will be used for rendering.
+	* @param str $separator string separator between models
 	* @see abstractModel::__toString() for more infos
 	*/
-	public function __toString($formatStr=null){
+	public function __toString($formatStr=null,$separator=''){
 		$this->loadDatas();
 		$modelFormatStr = abstractModel::_getModelStaticProp($this->collectionType,'__toString');
 		$formatStr = null===$formatStr?$modelFormatStr:preg_replace('!%model(?=\W|$)!',$modelFormatStr,$formatStr);
-		$str = '';$i=0;
+		$str = array();$i=0;
 		foreach($this as $m){
 			${'model'.++$i}=$m;
-			$str.= preg_replace('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','$model'.$i.'->\\1',$formatStr);
+			$str[]= preg_replace('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','$model'.$i.'->\\1',$formatStr);
 		}
-		$str_=$str;
+		$str=implode($separator,$str);
 		$str = preg_replace(array('/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array("\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$str);
 		return eval('return<<<__TOSTRING'."\n$str\n__TOSTRING;\n");
 	}
@@ -1087,66 +1091,54 @@ abstract class abstractModel{
 	* @param bool $isDummyInstance this is only there for internal purpose (such as call to getModelDbAdapter method)
 	*/
 	protected function __construct($PK=null,$isDummyInstance=false){
-		if( $this->_avoidEmptyPK && empty($PK) )
-			$PK = null;
-
-		#- first set some internalDatas for easier further access
-		if( empty(self::$_internals[get_class($this)]) ){
-			$oneKeys = $manyKeys = $datasKeys = array();
-			#- prepare related keys exp
-			foreach(array_keys(self::_getModelStaticProp($this,'hasOne')) as $k)
-				$oneKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-			self::$_internals[get_class($this)]['hasOneKeyExp'] = implode('|',$oneKeys);
-			foreach(array_keys(self::_getModelStaticProp($this,'hasMany')) as $k)
-				$manyKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-			self::$_internals[get_class($this)]['hasManyKeyExp'] = implode('|',$manyKeys);
-			self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasManyKeyExp']
-				.((count($oneKeys)&&count($manyKeys))?'|':'')
-				.self::$_internals[get_class($this)]['hasManyKeyExp'];
-			#- prepare datas keys exp
-			$datasDefs = self::_getModelStaticProp($this,'datasDefs');
-			foreach(array_keys($datasDefs) as $k)
-				$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
-			$datasKeys[] = 'PK';
-			self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
-		}
-
-		#- get dbAdapter instance
+		#- first set internalDatas
+		$this->_initInternals();
+		#- link dbAdapter instance
 		$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
 		if( self::$useDbProfiler )
 			$this->dbAdapter = new dbProfiler($this->dbAdapter);
-
+		#- dummy instances do nothing more and return
 		if( $isDummyInstance )
 			return;
-
-		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-
-		#- then check for addons to embed
-		$modelAddons = self::_getModelStaticProp($this,'modelAddons');
-		if( ! empty($modelAddons) ){
-			foreach($modelAddons as $addon){
-				$addonClass = $addon.'ModelAddon';
-				$_addon = new $addonClass($this,$PK);
-				$this->_modelAddons[$addon] = $_addon;
-			}
-			#- check addons haven't already set datas by checking primary key
-			if( $PK !== null){
-				self::setModelDatasType($this,$primaryKey,$this->datas[$primaryKey]);
-				if( $this->datas[$primaryKey] === $PK ) #- considering that datas has been setted by addons
-					return;
-			}
-		}
-
-		#- finally set datas
-		if( $PK === null){
-			$this->datas[$primaryKey] = uniqid('abstractModelTmpId',true);
-			return ;
-		}
-		$this->datas = $this->dbAdapter->select_single_to_array(self::_getModelStaticProp($this,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
-		if( false !== $this->datas )
-			$this->setModelDatasTypes();
+		#- init addons for real instances
+		$this->_initModelAddons($PK);
+	}
+	/**
+	* set some internalDatas for easier further access
+	*/
+	private function _initInternals(){
+		if(! empty(self::$_internals[get_class($this)]) )
+			return;
+		$oneKeys = $manyKeys = $datasKeys = array();
+		#- prepare related keys exp
+		foreach(array_keys(self::_getModelStaticProp($this,'hasOne')) as $k)
+			$oneKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
+		self::$_internals[get_class($this)]['hasOneKeyExp'] = implode('|',$oneKeys);
+		foreach(array_keys(self::_getModelStaticProp($this,'hasMany')) as $k)
+			$manyKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
+		self::$_internals[get_class($this)]['hasManyKeyExp'] = implode('|',$manyKeys);
+		self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasManyKeyExp']
+			.((count($oneKeys)&&count($manyKeys))?'|':'')
+			.self::$_internals[get_class($this)]['hasManyKeyExp'];
+		#- prepare datas keys exp
+		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+		foreach(array_keys($datasDefs) as $k)
+			$datasKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
+		$datasKeys[] = 'PK';
+		self::$_internals[get_class($this)]['datasKeyExp'] = implode('|',$datasKeys);
 	}
 
+	private function _initModelAddons($PK){
+		$modelAddons = self::_getModelStaticProp($this,'modelAddons');
+		if( empty($modelAddons) )
+			return false;
+		foreach($modelAddons as $addon){
+			$addonClass = $addon.'ModelAddon';
+			$_addon = new $addonClass($this,$PK);
+			$this->_modelAddons[$addon] = $_addon;
+		}
+		return true;
+	}
 	/**
 	* used internally to permit unique object instance on newly inserted models.
 	* @param abstractModel $instance.
@@ -1164,13 +1156,13 @@ abstract class abstractModel{
 	* @param string $modelName   model name
 	* @param mixed  $PK          value of the primary key
 	* @param bool   $returnModel set this to true to return living model instead of true on success
-	* @return bool or abstractModel if $returnModel is true
+	* @return bool or abstractModel/null if $returnModel is true
 	*/
 	static public function isLivingModelInstance($modelName,$PK,$returnModel=false){
 		#- ~ show($PK,(isset(self::$instances[strtolower($modelName)][$PK])?true:false),'color:green');
 		if(! isset(self::$instances[strtolower($modelName)][$PK])){
 			#- ~ self::showInstances('datas');
-			return false;
+			return $returnModel?null:false;
 		}
 		return $returnModel?self::$instances[strtolower($modelName)][$PK]:true;
 	}
@@ -1179,18 +1171,40 @@ abstract class abstractModel{
 	* return unique abstractModel instance by primary key or a new empty one.
 	* @param string $modelName  model name
 	* @param mixed  $PK         value of the primary key
-	* @return abstractModel of false on error
+	* @return abstractModel or null on error
 	*/
 	static public function getModelInstance($modelName,$PK=null){
+		#- make some check on PK (type/empty)
+		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
+		if( empty($PK) && self::_getModelStaticProp($modelName,'_avoidEmptyPK') )
+			$PK = null;
+		else
+			$PK = self::setModelDatasType($modelName,$primaryKey,$PK);
 		# check for living instance
 		if(null!==$PK){
 			$instance = self::isLivingModelInstance($modelName,$PK,true);
-			if($instance!==false)
+			if($instance instanceof abstractModel)
 				return $instance;
 		}
+		#- haven't found any living instance so get one
 		$instance = new $modelName($PK);
-		if($instance->datas === false)
-			return false;
+
+		#- newly created model we just set a temporary primaryKey and return it
+		if( null === $PK ){
+			$instance->datas[$primaryKey] = uniqid('abstractModelTmpId',true);
+			self::_setInstanceKey($instance);
+			return $instance;
+		}
+		#- if primaryKey is already set in datas this normaly mean that modelAddons have do the setDatas job so we just end here
+		if( null !== $PK && $PK===$instance->PK ){
+			self::_setInstanceKey($instance);
+			return $instance;
+		}
+		#- finally if we're there get datas from db and set them
+		$instance->datas = $instance->dbAdapter->select_single_to_array(self::_getModelStaticProp($instance,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
+		if( false === $instance->datas) #- error no datas in database
+			return null;
+		$instance->setModelDatasTypes();
 		self::_setInstanceKey($instance);
 		return $instance;
 	}
@@ -1206,28 +1220,38 @@ abstract class abstractModel{
 	* @param bool   $bypassFilters       if true then will bypass datas filtering and users setters
 	* @param bool   $leaveNeedSaveState  by default setting datas will set $this->needSave to 1, setting this parameter to true
 	*                                    will leave $this->needSave to its previous state (generally used by modelCollection::loadDatas()).
+	* @return abstractModel
 	*/
 	static public function getModelInstanceFromDatas($modelName,$datas,$dontOverideIfExists=false,$bypassFilters=false,$leaveNeedSaveState=false){
-		# check for living instance
+		#- make some check on PK (type/empty)
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
-		$instance   = false;
-		if(isset($datas[$primaryKey])){ #- check for living instance
+		#-  have we a primaryKey in datas or not?
+		if( isset($datas[$primaryKey])){
 			$PK = $datas[$primaryKey];
+			if( empty($PK) && self::_getModelStaticProp($modelName,'_avoidEmptyPK') )
+				$PK = null;
+			else
+				$PK = self::setModelDatasType($modelName,$primaryKey,$PK);
+			unset($datas[$primaryKey]);
+		}
+		$instance   = null;
+
+		#- check for living instance
+		if(null!==$PK){
 			$instance = self::isLivingModelInstance($modelName,$PK,true);
-			if( false!==$instance){
-				if($dontOverideIfExists)
-					return $instance;
-				unset($datas[$primaryKey]);
+			if( $instance instanceof abstractModel){
+				if(! $dontOverideIfExists )
+					$instance->_setDatas($datas,$bypassFilters,null,$leaveNeedSaveState);
+				return $instance;
 			}
 		}
-		if(false === $instance)
-			$instance = self::getModelInstance($modelName);
+		#- here we haven't found any living instance or haven't any PK so just get a new instance
+		$instance = new $modelName($PK);
 
-		if(isset($datas[$primaryKey])){
-			$oldPK = $instance->PK;
-			$instance->datas[$primaryKey] = self::setModelDatasType($modelName,$primaryKey,$datas[$primaryKey]);
-			self::_setInstanceKey($instance,$oldPK);
-		}
+		if( null===$PK )#- no primaryKey given get a temporary Key
+			$PK = uniqid('abstractModelTmpId',true);
+		$instance->datas[$primaryKey] = $PK;
+		self::_setInstanceKey($instance);
 		#- set Datas
 		return $instance->_setDatas($datas,$bypassFilters,null,$leaveNeedSaveState);
 	}
@@ -1794,7 +1818,7 @@ abstract class abstractModel{
 		if($bypassFilters)
 			$this->bypassFilters=true;
 
-		$this->__set($key,self::setModelDatasType($this,$key,$value));
+		$this->__set($key,$value);
 
 		$this->bypassFilters = $filterState;
 		if(false !== $leaveNeedSaveState )
@@ -1989,7 +2013,7 @@ abstract class abstractModel{
 		$hasMany = self::_getModelStaticProp($modelName,'hasMany');
 		if( $relType !== null){
 			if(! in_array($relType,array('requiredBy','dependOn','ignored'),true))
-				throw new Exception("$modelName::hasRelated('$reltype') Invalid value for parameter relType");
+				throw new Exception("$modelName::hasRelated('$relType') Invalid value for parameter relType");
 			foreach($hasOne as $name=>$def){
 				if($def['relType']!==$relType)
 					unset($hasOne[$name]);
