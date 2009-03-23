@@ -1226,7 +1226,9 @@ abstract class abstractModel{
 		#- make some check on PK (type/empty)
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		#-  have we a primaryKey in datas or not?
-		if( isset($datas[$primaryKey])){
+		if(!  isset($datas[$primaryKey])){
+			$PK = null;
+		}else{
 			$PK = $datas[$primaryKey];
 			if( empty($PK) && self::_getModelStaticProp($modelName,'_avoidEmptyPK') )
 				$PK = null;
