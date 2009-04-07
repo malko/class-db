@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-04-03 - add one level trace context information to dbProfiler reports
 *            - 2009-02-06 - add css class dbMsg to verbose messages
 *            - 2008-10-10 - new static property $_default_verbosity to set default beverbose value of any further new db instance
 *            - 2008-07-30 - some minor changes in dbProfiler report representation and bug correction in colors
@@ -83,8 +84,20 @@ class dbProfiler{
 			return call_user_func_array(array($this->db,$m),$a);
 		# - get stat on queries
 		$trace = debug_backtrace();
+		if(! isset($trace[2])){
+			$traceContext='';
+		}else{
+			if(empty($trace[2]['type']))
+				$traceContextObject = '';
+			else
+				$traceContextObject = (($trace[2]['type']=='::'?$trace[2]['class']:get_class($trace[2]['object'])).$trace[2]['type']);
+			$traceContext = $traceContextObject.$trace[2]['function'].'(...)'.(isset($trace[2]['file'])?' in '.basename($trace[2]['file']).' ('.$trace[2]['line'].')':'');
+		}
+		$trace = basename($trace[1]['file']).' ('.$trace[1]['line'].')';
+		if(! empty($traceContext) )
+			$trace = "<abbr title=\"$traceContext\">$trace</abbr>";
 		$stat = array(
-			basename($trace[1]['file']).'('.$trace[1]['line'].')',
+			$trace,
 			"<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',
 			$this->get_microtime()
 		);
