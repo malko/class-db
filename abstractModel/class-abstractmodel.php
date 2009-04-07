@@ -11,6 +11,10 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
+*                         - modelAddons::isModelMethodOverloaded() is now case insensitive
+*                         - modelCollection::__set() just pass value to models in it with no check at all
+*            - 2009-04-02 - modelCollection::sortCompare() now will work on hasOne related by using their primaryKey.
 *            - 2009-03-18 - modelCollection::__toString() take second parameter $separator again
 *                         - rewrite abstractmodel constructor, getModelInstance, getModelInstanceFromDatas to properly pass primaryKey value to modelAddons constructors (ie: when initialising collection).
 *            - 2009-03-17 - now abstractmodel::_setDatas() use directly the __set() method to permit call to _setDatas inside user defined setter.
@@ -146,13 +150,15 @@ abstract class modelAddon{
 
 	/**
 	* check if a modelAddon handle or not a given method (sort of methods_exists but can handle dynamic methods such as thoose managed by __call (in such case must be declared in self::$overloadedModelMethods);
+	* @note to modelAddon developpers: when developping addon with dynamic overloaded methods, please consider using abstractModel::_setData() inside your ovveriden setter
+	*       and be sure to pass third parameter ($bypassFilters) to true if you want things to work like you expect. If you don't you'll probably end in unpredictable behaviour (such as infinite loop at setting time for example)
 	* @param string $methodname
 	* @return bool
 	*/
 	public function isModelMethodOverloaded($methodName){
 		if( method_exists($this,$methodName) )
 			return true;
-		elseif( (! empty($this->overloadedModelMethods) ) && in_array($methodName,$this->overloadedModelMethods))
+		elseif( (! empty($this->overloadedModelMethods) ) && in_array(strtolower($methodName),array_map('strtolower',$this->overloadedModelMethods)))
 			return true;
 		return false;
 	}
@@ -418,11 +424,8 @@ class modelCollection extends arrayObject{
 	* set all models property in collection at once
 	*/
 	function __set($k,$v){
-		$this->loadDatas();
-		foreach($this as $mk=>$m){
-			if( isset($m->$k) )
-				$m->$k = $v;
-		}
+		foreach($this->loadDatas() as $mk=>$m)
+			$m->$k = $v;
 	}
 
 	/**
@@ -739,6 +742,10 @@ class modelCollection extends arrayObject{
 	private function sortCompare($_a,$_b){
 		$a = $_a->{$this->_sortBy};
 		$b = $_b->{$this->_sortBy};
+		if($a instanceof abstractModel)
+			$a = $a->PK;
+		if($b instanceof abstractModel)
+			$b = $b->PK;
 		if($a == $b){
 			#- rely on actual sorting position inside the collection
 			$keys = $this->keys();
@@ -762,7 +769,8 @@ class modelCollection extends arrayObject{
 
 	###--- FILTERING METHODS ---###
 	/**
-	* return a modelCollection that contains only models filtered by the given key that match expression
+	* return a modelCollection that contains only models filtered by the given property that match expression
+	* propertyName can be a datas field or a hasOne related model for now you can't filter on a hasMany relation
 	* @param string $propertyName           the property on which you want to apply filter
 	* @param mixed  $exp                    the value the property must match
 	* @param string $comparisonOperator     comparison operator to use default is ===
@@ -772,14 +780,44 @@ class modelCollection extends arrayObject{
 	*                                       - 'in' and '!in' can be used with an array (or modelCollection) as $exp
 	*                                       to check that properties are or not in_array/in_collection $exp
 	*                                       - 'IN' and '!IN' are like 'in' and '!in' but use a strict comparison
+	*                                       (no differences whit in/!in when working on hasOne property)
 	* return modelCollection a new modelCollection with only matching elements
 	*/
 	public function filterBy($propertyName,$exp,$comparisonOperator=null){
 		$filtered = array();
 		if( $this->count() < 1)
 			return modelCollection::init($this->collectionType);
+
 		#- prepare comparisonDatas
 		$comparisonDatas = $this->getPropertyList($propertyName);
+
+		$relDefs = abstractModel::modelHasRelDefs($this->collectionType,null,true);
+		if( isset($relDefs['hasMany'][$propertyName]) )#-- comparison on related hasMany is not implemented for now
+			throw new Exception("modelCollection::filterBy('$propertyName') can't work on a hasMany property");
+		if( isset($relDefs['hasOne'][$propertyName]) ){#-- comparison on related hasOne only compare primary keys
+			$modelName = $relDefs['hasOne'][$propertyName]['modelName'];
+			foreach($comparisonDatas as $k=>$v)
+				$comparisonDatas[$k] = ($v instanceof abstractModel?$v->PK:$v);
+			if( $exp instanceof abstractModel){
+				if(! $exp instanceof $modelName)
+					throw new Exception("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
+				$exp = $exp->PK;
+			}elseif($exp instanceof modelCollection){
+				if( $exp->collectionType !== $modelName)
+					throw new Exception("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
+				$exp = $exp->keys();
+			}elseif(is_array($exp)){
+				foreach($exp as $k=>$v){
+					if($v instanceof $modelName)
+						$v = $v->PK;
+					else
+						abstractModel::setModelDatasType($modelName,abstractModel::_getModelStaticProp($modelName,'primaryKey'),$v);
+					$exp[$k] = $v;
+				}
+			}else{
+				abstractModel::setModelDatasType($modelName,abstractModel::_getModelStaticProp($modelName,'primaryKey'),$exp);
+			}
+		}
 
 		if( null===$comparisonOperator || '===' === $comparisonOperator){ #- strict comparison
 			foreach($comparisonDatas as $k=>$v){
@@ -794,18 +832,13 @@ class modelCollection extends arrayObject{
 		}elseif( in_array($comparisonOperator,array('in','!in','IN','!IN')) ){ # in array/collection comparison
 			$strict=$comparisonOperator[strlen($comparisonOperator)-1]==='N'?true:false;
 			$not   = $comparisonOperator[0]==='!'?'!':'';
-			if( $exp instanceof modelCollection){
-				foreach($comparisonDatas as $k=>$v)
-					eval('if('.$not.' isset($exp[$v->PK]) ) $filtered[] = $this[$k];');
-			}else{
-				foreach($comparisonDatas as $k=>$v)
-					eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
-			}
+			foreach($comparisonDatas as $k=>$v)
+				eval('if('.$not.' in_array($v,$exp,$strict)) $filtered[] = $this[$k];');
 		}else{ #- user defined comparison
 			foreach($comparisonDatas as $k=>$v)
 				eval('if( $v '.$comparisonOperator.' $exp) $filtered[] = $this[$k];');
 		}
-		return abstractModel::getMultipleModelInstances($this->collectionType,$filtered);
+		return modelCollection::init($this->collectionType,$filtered);
 	}
 
 	/**
@@ -1819,9 +1852,7 @@ abstract class abstractModel{
 			$leaveNeedSaveState = $this->needSave;
 		if($bypassFilters)
 			$this->bypassFilters=true;
-
 		$this->__set($key,$value);
-
 		$this->bypassFilters = $filterState;
 		if(false !== $leaveNeedSaveState )
 			$this->needSave = $leaveNeedSaveState;

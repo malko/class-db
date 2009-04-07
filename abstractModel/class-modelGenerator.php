@@ -12,9 +12,11 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-04-01 - $_avoidEmptyPK is now true by default
+*            - 2009-03-30 - add support for prefixed tables by adding new static properties $tablePrefixes and $excludePrefixedTables
 *            - 2009-02-09 - add new BASE_models static methods _GetSupportedAddons _SupportsAddon
 *                         - add $_avoidEmptyPK property to final models
-*            - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys 
+*            - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys
 *            - 2008-09-04 - add extended modelCollection
 *            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
 *            - 2008-08-13 - add method proposition to access enum fields possible values
@@ -67,6 +69,19 @@ class modelGenerator{
 	public $onExist = 'a';
 
 	/**
+	* will only include tables that starts with given prefixes
+	* if $excludePrefixedTables is set to true then will include all tables that don't start with given prefixes.
+	* You can pass here a list of table prefixes separated by '|' (ie: 'excludeprefix1_|excludeprefix2')
+	* Note: prefixes given are case sensitive!
+	*/
+	static public $tablePrefixes='';
+	/**
+	* this property only make sense when $tablePrefixes is set.
+	* By default only tables matching given $tablePrefixes are included in model generation process
+	* but setting this to true model generation will then only include talbes that don't match the given prefixes.
+  */
+	static public $excludePrefixedTables=false;
+	/**
 	* create an instance of modelGenerator.
 	* @param string $dbConenctionStr
 	* @param string $outputDir
@@ -86,16 +101,26 @@ class modelGenerator{
 
 	/**
 	* generate class for each table in database.
-	* @param string $prefix               add a prefix to generated models
 	* @param string $dbConnectionDefined  an optionnal defined dbConnectionStr to use as a replacement for connectionStr
 	*                                     really usefull when you want to change the database connection string without
 	*                                     editing all models.
+	* @param string $prefix               add a prefix to generated models
 	*/
-	function doGeneration($dbConnectionDefined=null,$prefix='model'){
+	function doGeneration($dbConnectionDefined=null,$prefix=''){
 		#- get table list
 		$tables  = $this->db->list_tables();
 		if(! $tables)
 			return false;
+		if( !empty(self::$tablePrefixes) ){
+			foreach($tables as $k=>$v){
+				$match = preg_match('!^('.self::$tablePrefixes.')!',$v);
+				if( $match && self::$excludePrefixedTables)
+					unset($tables[$k]);
+				elseif( (!$match) && ! self::$excludePrefixedTables)
+					unset($tables[$k]);
+			}
+		}
+
 		#- get singles names
 		foreach($tables as $tb)
 			$singles[$tb] = preg_replace("!(s|x)$!","",$tb);
@@ -460,7 +485,7 @@ class $modelName extends BASE_$modelName{
 	* if true then the model can't have an empty primaryKey value (empty as in php empty() function)
 	* so passing an empty PrimaryKey at getInstance time will result to be equal to a getNew call
 	*/
-	static protected \$_avoidEmptyPK = false;"
+	static protected \$_avoidEmptyPK = true;"
 	.(empty($methods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$methods)).
 	"
 }
@@ -493,6 +518,9 @@ class ".$modelName."Collection extends modelCollection{
 	}
 
 	static protected function __prefix($name,$prefix){
+		if( !empty(self::$tablePrefixes)){
+			$name=preg_replace('!^('.self::$tablePrefixes.')!','',$name);
+		}
 		return $prefix.(preg_match('![a-z]$!i',$prefix)?ucFirst($name):$name);
 	}
 
