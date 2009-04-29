@@ -30,8 +30,8 @@
 error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
-require('../../console_app/trunk/class-console_app.php');
-require('class-db.php');
+require('libs/class-console_app.php');
+require('../class-db.php');
 
 #setting apps params and desc
 $app = new console_app();
