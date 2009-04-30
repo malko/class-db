@@ -246,7 +246,7 @@ class db{
 			$pEval[] = "\$params[$i]";
 		}
 		if(! class_exists($class,false) )
-			require (dirname(__file__)."/dbAdapters/class-$class.php");
+			require (dirname(__file__)."/adapters/class-$class.php");
 		eval( '$instance = new '.$class.'('.implode(',',$pEval).');');
 		if( self::$_default_verbosity )
 			$instance->beverbose = (int) self::$_default_verbosity;
