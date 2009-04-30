@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 *            - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
+*                         - bug correction in getFilteredModelInstance() with $_avoidEmptyPK set to true that returned temporary model instead of null on empty results. (back to normal behaviour, returning null)
 *            - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
 *                         - modelAddons::isModelMethodOverloaded() is now case insensitive
 *                         - modelCollection::__set() just pass value to models in it with no check at all
@@ -1330,13 +1331,15 @@ abstract class abstractModel{
 	* return single instance of modelName that match given filter
 	* @param string $modelName
 	* @param array  $filter    same as conds in class-db methods
-	* @return single abstractModel instance
+	* @return single abstractModel instance or null if not found
 	*/
 	static public function getFilteredModelInstance($modelName,$filter=null){
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$db = self::getModelDbAdapter($modelName);
 		$PK = $db->select_value($tableName,$primaryKey,$filter);
+		if( false===$PK)
+			return null;
 		return self::getModelInstance($modelName,$PK);
 	}
 
