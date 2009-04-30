@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
 *            - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
 *                         - modelAddons::isModelMethodOverloaded() is now case insensitive
 *                         - modelCollection::__set() just pass value to models in it with no check at all
@@ -695,6 +696,7 @@ class modelCollection extends arrayObject{
 	*                      - natc use natural order comparison case insensitive (strnatcasecmp)
 	*                      - bin  use binary string comparison case sensitive(strcmp)
 	*                      - binc use binary string comparison case insensitive (strcasecmp)
+	*                      - shuffle use to randomize the collection. (used internally by method shuffle)
 	*                      - user defined callback function (any callable comparison function (see php::usort() for more info)
 	* @return $this for method chaining
 	*/
@@ -740,6 +742,8 @@ class modelCollection extends arrayObject{
 	* @see modelCollection::sort(), modelCollection::rsort()
 	*/
 	private function sortCompare($_a,$_b){
+		if( 'shuffle' === $this->_sortType ) #- shuffle don't need to know real values
+			return rand(-1,1);
 		$a = $_a->{$this->_sortBy};
 		$b = $_b->{$this->_sortBy};
 		if($a instanceof abstractModel)
@@ -765,6 +769,14 @@ class modelCollection extends arrayObject{
 		if( $this->_sortReversed)
 			return $res>0?-1:1;
 		return $res;
+	}
+
+	/**
+	* randomize order of elements in collection
+	* @return modelCollection $this for method chaining
+	*/
+	public function shuffle(){
+		return $this->sort('PK','shuffle');
 	}
 
 	###--- FILTERING METHODS ---###
