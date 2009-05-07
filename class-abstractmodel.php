@@ -2250,7 +2250,7 @@ abstract class abstractModel{
 					$datas[$primaryKey] = $nPK = $this->_newPrimaryKey();
 					if( $this->dbAdapter->insert($tableName,$datas,false) === false )
 						throw new Exception(get_class($this)." Error while saving (PK=$nPK).");
-					$this->data[$primaryKey] = $nPK;
+					$this->datas[$primaryKey] = $nPK;
 				}
 				#- reset temporary instance Key
 				self::_setInstanceKey($this,$PK);
