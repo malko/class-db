@@ -107,8 +107,6 @@ class mysqlidb extends db{
 				default:
 				case 'active':
 					preg_match('!^([^:]+)(:(\d+))?$!',$this->host,$m);
-					print_r($m);
-					#if(! $this->conn = mysqli_connect($m[1],$this->user,$this->pass,$this->dbname)){
 					if(! $this->conn = mysqli_connect($m[1],$this->user,$this->pass,null,empty($m[3])?null:$m[3])){
 						$this->verbose("connection to $this->host failed",__FUNCTION__,1);
 						return FALSE;
