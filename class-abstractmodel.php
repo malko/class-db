@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-05-28 - now abstractmodel::_setDatas() can also set hasOne and hasMany relations
 *            - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
 *                         - bug correction in getFilteredModelInstance() with $_avoidEmptyPK set to true that returned temporary model instead of null on empty results. (back to normal behaviour, returning null)
 *            - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
@@ -1831,6 +1832,8 @@ abstract class abstractModel{
  	*/
 	public function _setDatas($datas,$bypassFilters=false,$forcedPrimaryKey=null,$leaveNeedSaveState=false){
 		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
+		$hasMany = self::_getModelStaticProp($this,'hasMany');
+		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
 		$filtersState = $this->bypassFilters;
 		if(false !== $leaveNeedSaveState )
@@ -1838,9 +1841,13 @@ abstract class abstractModel{
 		if($bypassFilters)
 			$this->bypassFilters = true;
 		foreach($datas as $k=>$v){
-			if( (! isset($datasDefs[$k])) || $k===$primaryKey)
+			if(  $k===$primaryKey)
 				continue;
+			if( isset($datasDefs[$k]) || isset($hasOne[$k]) ){
 			$this->$k = $v;
+			}else{
+				$this->{'set'.$k.'Collection'}($v);
+			}
 		}
 		$this->bypassFilters = $filtersState;
 		if( null !== $forcedPrimaryKey )
