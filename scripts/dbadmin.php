@@ -425,10 +425,10 @@ export SQL statements; filename   export the given query as csv to filename
 import filename tablename         import the given csv file in table
 
 ###--- Datas cleaning methods ---###
-maptable callback tablename [filter:condition] [PK:field_primaryKey]
+maptable callback tablename [filter:conditions clause]
                                   allow you to array_map a phpfunction
                                   on all datas in given table
-mb_detectconvert tablename [filter:condition] [PK:field_primaryKey]
+mb_detectconvert tablename [filter:conditions clause]
                                   try to convert datas charset in given table
                                   this REQUIRE mbstring extension to be loaded
                                   and is totally independant of the database
