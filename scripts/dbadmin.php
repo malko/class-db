@@ -7,7 +7,10 @@
 *            - $LastChangedRevision$
 *            - $LastChangedBy$
 *            - $HeadURL$
-* @changelog - 2008-03-20 - add the rehash command to refresh completion table
+* @changelog
+*            - 2009-06-01 - new command togglelines
+*                         - now use a config file for pageSize, maxcolsize, maxcolwidth,togglelines
+*            - 2008-03-20 - add the rehash command to refresh completion table
 *                         - add maxcolsize and maxcolwidth command
 *                         - bug correction that offer page navigation on agregation query (ie: select count(*) from...)
 *            - 2008-03-19 - new possibility to call some callBack on tables to clean datas
@@ -31,13 +34,14 @@ error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
 require('libs/class-console_app.php');
+require('libs/fx-conf.php');
 require('../class-db.php');
 
 #setting apps params and desc
 $app = new console_app();
 
 console_app::$lnOnRead = FALSE; # don't add a new line on read
-console_app::$dflt_styles['table']['nolines'] = true; # no separation lines between results rows
+
 
 $app->set_app_desc("dbAdmin is a command line tool to manage databases.
 dbadmin [options] databaseConnectionStr
@@ -74,6 +78,15 @@ if( empty($dbType) ){
     $dbType = 'sqlitedb';
     $connectionStr = 'sqlitedb://'.$connectionStr;
   }
+}
+
+#- try to load preferences settings
+if( file_exists($_SERVER['HOME'].'/.dbadmin.prefs')){
+	$CONFIG = parse_conf_file($_SERVER['HOME'].'/.dbadmin.prefs',true);
+	if( isset($CONFIG['MAXCOL_WIDTH']))
+    console_app::$dflt_styles['table']['maxwidth']['dflt'] = $CONFIG['MAXCOL_WIDTH'];
+	if( isset($CONFIG['LINESEP']))
+		console_app::$dflt_styles['table']['nolines'] = $CONFIG['LINESEP']; # toggle separation lines between results rows
 }
 
 # now that include are done return to original path
@@ -311,11 +324,15 @@ while(TRUE){
     case 'create':
     case 'drop':
     case 'update':
+    case 'query:':
+			if( $cmd==='query:'){
+				$read = substr($read,6);
+			}
       $Q_str = check_query($read);
       perform_query($Q_str);
       break;
     case 'use':
-    	if(! ($db instanceof mysqldb) ){
+    	if(! ($db instanceof mysqldb || $db instanceof mysqlidb) ){
     		console_app::msg_info('only supported by mysqldb for now. (i\'m sure you can code and submit it, aren\'t you)?');
     		break;
     	}
@@ -329,13 +346,18 @@ while(TRUE){
     	$db->beverbose = (int) $args;
     	break;
     case 'pagesize':
-    	$pageSize = (int) $args;
+    	setConfig('PAGE_SIZE',(int) $args);
     	break;
     case 'maxcolwidth':
-    	console_app::$dflt_styles['table']['maxwidth']['dflt'] = (int) $args;
+			setConfig('MAXCOL_WIDTH',$args==='0'?'--UNSET--':(int) $args);
+    	console_app::$dflt_styles['table']['maxwidth']['dflt'] = $CONFIG['MAXCOL_WIDTH'];
     	break;
     case 'maxcolsize':
-			$maxColSize = (int) $args;
+			setConfig('MAXCOL_SIZE',(int) $args);
+    	break;
+		case 'togglelines':
+			setConfig('LINESEP',empty($CONFIG['LINESEP'])?true:false);
+			console_app::$dflt_styles['table']['nolines'] = $CONFIG['LINESEP'];
     	break;
     case 'help':
     case 'h':
@@ -343,7 +365,7 @@ while(TRUE){
       display_help();
       break;
     case '';
-      if(console_app::msg_confirm("Exit dbAdmin ?"))
+      if(console_app::msg_confirm("Exit dbAdmin ?",null,TRUE))
         break 2;
       break;
     default:
@@ -404,19 +426,24 @@ master                            display the content of SQLITE_MASTER
                                   (sqlitedb only)
 SQL statements                    perform a query on the database such as
                                   select, insert update or delete
+query: statements                 must be used for special commands such as
+                                  mysql set NAMES 
 rehash,#                          refresh completion table
 
 ###--- Display settings ---###
 verbosity n                       change verbose level while inside the app
 pagesize n                        set the number of results by page
-maxcolwidth n                     set the max cols width to n
-maxcolsize n                      set the max chars in cols to n
+maxcolwidth n                     set the max cols width to n (0 to reset)
+maxcolsize n                      set the max chars in cols to n (0 to reset)
                                   (results will be truncated)
+togglelines                       toggle on/off the display of separating lines
+                                  between table rows
+
 ###--- Paging commands (only when displaying results) ---###
 n                                 go directly to page n
 <, >, <<, >>                      respectively go to
                                   previous, next, first and last page
-pagesize n                        set the number of results by page
+other commands available          pagesize, maxcolsize, maxcolwidth, togglelines
 
 ###--- Import/Export datas from/to csv files ---###
 export tablename filename         export the given table as a csv file
@@ -536,32 +563,42 @@ function callbackOnTable($callBack,$table,$filter=null){
 * @param array $sliceRes result as returned by db::select_array_slice()
 */
 function printPagedTable($table,$fields,$conds,$pageId=1){
-  global $pageSize,$db,$maxColSize;
-  if(! isset($pageSize) )$pageSize = 10;
-  $res = $db->select_array_slice($table,$fields,$conds,$pageId,$pageSize);
+  global $CONFIG ,$db;
+  if(! isset($CONFIG) ) setConfig('PAGE_SIZE',10);
+  $res = $db->select_array_slice($table,$fields,$conds,$pageId,$CONFIG['PAGE_SIZE']);
 
   if(! $res )
     return console_app::msg("No Result!");
 
   # on affiche le tableau:
   list($results,$nav,$total) = $res;
-  if( !empty($maxColSize) ){
+  if( !empty($CONFIG['MAXCOL_SIZE']) ){
   	foreach($results as $k=>$row)
 			$results[$k] = array_map('truncateMap',$row);
 	}
   console_app::print_table($results);
 
 	# no navigation on unique page
-  if($total <= $pageSize || ($pageId===1 && count($results) < $pageSize) )
+  if($total <= $CONFIG['PAGE_SIZE'] || ($pageId===1 && count($results) < $CONFIG['PAGE_SIZE']) )
   	return;
 
   # affiche la navigation
   $e = console_app::read($nav);
-  $lastPage = ceil($total/$pageSize);
+  $lastPage = ceil($total/$CONFIG['PAGE_SIZE']);
 
   if( preg_match('!^\s*pagesize (\d+)\s*!i',$e,$m) ){
-		$pageSize = (int) $m[1];
+		setConfig('PAGE_SIZE',$m[1]);
 		return printPagedTable($table,$fields,$conds,1);
+	}elseif( preg_match('!^\s*maxcolsize (\d+)\s*!i',$e,$m) ){
+		setConfig('MAXCOL_SIZE',$m[1]);
+		return printPagedTable($table,$fields,$conds,$pageId);
+	}elseif( preg_match('!^\s*maxcolwidth (\d+)\s*!i',$e,$m) ){
+		setConfig('MAXCOL_WIDTH',$m[1]);
+		return printPagedTable($table,$fields,$conds,$pageId);
+	}elseif( preg_match('!^\s*togglelines\s*!i',$e,$m) ){
+		setConfig('LINESEP',empty($CONFIG['LINESEP'])?true:false);
+		console_app::$dflt_styles['table']['nolines'] = $CONFIG['LINESEP'];
+		return printPagedTable($table,$fields,$conds,$pageId);
 	}
 
   if( is_numeric($e) ){ # numero de page on rappel la fonction avec le num de page
@@ -588,10 +625,19 @@ function printPagedTable($table,$fields,$conds,$pageId=1){
 }
 
 function truncateMap($str){
-	global $maxColSize;
-	if(strlen($str)<=$maxColSize)
+	global $CONFIG;
+	if(strlen($str)<=$CONFIG['MAXCOL_SIZE'])
 		return $str;
-	return substr($str,0,max(1,$maxColSize-3)).($maxColSize>4?"...":"");
+	return substr($str,0,max(1,$CONFIG['MAXCOL_SIZE']-3)).($CONFIG['MAXCOL_SIZE']>4?"...":"");
+}
+
+/**
+* keep trace of configuration options
+*/
+function setConfig($configKey,$configValue){
+	global $CONFIG;
+	$CONFIG[$configKey] = $configValue;
+	return write_conf_file($_SERVER['HOME'].'/.dbadmin.prefs',$CONFIG,true);
 }
 
 /**
@@ -663,7 +709,8 @@ function autocompletion(){
   	$completion = array(
 			'show','use','optimise','vacuum','master','verbosity','pagesize',
 			'export','import','maptable','mb_detectconvert','mb_detectorder',
-			'mb_detectstrict','mb_setconvert','rehash','maxcolwidth','maxcolsize'
+			'mb_detectstrict','mb_setconvert','rehash','maxcolwidth','maxcolsize',
+			'togglelines'
   	);
     if( $tables = $db->list_tables())
       foreach($tables as $table){
