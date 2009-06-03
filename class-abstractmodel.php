@@ -1844,7 +1844,7 @@ abstract class abstractModel{
 			if(  $k===$primaryKey)
 				continue;
 			if( isset($datasDefs[$k]) || isset($hasOne[$k]) ){
-			$this->$k = $v;
+				$this->$k = $v;
 			}else{
 				$this->{'set'.$k.'Collection'}($v);
 			}

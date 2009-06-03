@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
 *            - 2009-04-01 - $_avoidEmptyPK is now true by default
 *            - 2009-03-30 - add support for prefixed tables by adding new static properties $tablePrefixes and $excludePrefixedTables
 *            - 2009-02-09 - add new BASE_models static methods _GetSupportedAddons _SupportsAddon
@@ -266,7 +267,7 @@ class modelGenerator{
 		}
 
 		#- initVars
-		$methods = $datas = $datasTypes = $one2one = $one2many = $many2many = array();
+		$BASEmethods = $methods = $datas = $datasTypes = $one2one = $one2many = $many2many = array();
 		$modelName = self::__prefix($tableName,$prefix);
 
 		if( is_null($dbConnectionDefined) )
@@ -284,23 +285,37 @@ class modelGenerator{
 			if( preg_match('!^\s*ENUM\s*\((.*)\)\s*$!i',$f['Type'],$m)){
 				$vals = $m[1];
 				$methods[] = "
+	/**
+	* proposed filter to check setted value against enum possible values
+	*/
 	public function filter".ucFirst($f['Field'])."(\$val){
 		if(! in_array(\$val,self::get".ucFirst($f['Field'])."PossibleValues())){
 			\$this->appendFilterMsg('invalid $f[Field] value');
 			return false;
 		}
 		return \$val;
-	}
+	}";
+				$BASEmethods[]="
+	/**
+	* @return array list of possible values for correponding enum fields
+	*/
 	static public function get".ucFirst($f['Field'])."PossibleValues(){
 		return array($vals);
 	}
 	";
 			}elseif(strpos($f['Key'],'UNI')===0){
 				$ucFirst = ucFirst($f['Field']);
-				$methods[] = "
+				$BASEmethods[] = "
+	/**
+	* check if the given value already exists in database
+	*/
 	static public function check".$ucFirst."Exists(\$v,\$returnInstance=false,\$ignoredPK=null){
 		return self::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v, \$returnInstance, \$ignoredPK);
-	}
+	}";
+				$methods[]="
+	/**
+	* proposed filter to avoid setting an already existing values to a unique field.
+	*/
 	public function filter".$ucFirst."(\$val){
 		\$exists = $modelName::check".$ucFirst."Exists(\$val,false,\$this->isTemporary()?null:\$this->PK);
 		if( \$exists ){
@@ -441,7 +456,9 @@ class BASE_$modelName extends abstractModel{
 	}
 	static public function hasRelDefs(\$relType=null,\$returnDef=false){
 		return abstractModel::modelHasRelDefs('$modelName',\$relType,\$returnDef);
-	}
+	}"
+	.(empty($BASEmethods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$BASEmethods)).
+	"
 }
 ";
 $str2 = "<?php
