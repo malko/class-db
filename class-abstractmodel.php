@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-06-22 - modelCollection::shuffle() doesn't automaticly loadDatas anymore.
+*            - 2009-06-16 - bug correction on setting hasManyCollection on relations where relName was diffent from related modelName
+*            - 2009-06-12 - abstractmodel::getPagedModelInstances() suppress warning error on empty results sets
 *            - 2009-05-28 - now abstractmodel::_setDatas() can also set hasOne and hasMany relations
 *            - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
 *                         - bug correction in getFilteredModelInstance() with $_avoidEmptyPK set to true that returned temporary model instead of null on empty results. (back to normal behaviour, returning null)
@@ -721,7 +724,8 @@ class modelCollection extends arrayObject{
 		}
 		$this->_sortType = $sortType;
 		#- ensure datas are loaded to avoid multiple on demand loading
-		$this->loadDatas();
+		if( 'shuffle'!== $sortType )
+			$this->loadDatas();
 		uasort($this,array($this,'sortCompare'));
 		return $this;
 	}
@@ -778,7 +782,7 @@ class modelCollection extends arrayObject{
 	* @return modelCollection $this for method chaining
 	*/
 	public function shuffle(){
-		return $this->sort('PK','shuffle');
+		return $this->sortByPK('shuffle');
 	}
 
 	###--- FILTERING METHODS ---###
@@ -1427,10 +1431,12 @@ abstract class abstractModel{
 		if( $rows === false )
 			return array($collection,'',0);
 		list($rows,$nav,$total) = $rows;
-		foreach($rows as $row)
-			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
-		if( null !== $withRelated )
-			$collection->loadDatas($withRelated);
+		if(! empty($rows)){
+			foreach($rows as $row)
+				$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
+			if( null !== $withRelated )
+				$collection->loadDatas($withRelated);
+		}
 		return array($collection,$nav,$total);
 	}
 	/**
@@ -1746,18 +1752,18 @@ abstract class abstractModel{
 		#- manage setter methods for hasMany related
 		if( preg_match('!set_?('.self::$_internals[$className]['hasManyKeyExp'].')_?[cC]ollection$!',$m,$match) ){
 			$relName = self::_cleanKey($this,'hasMany',$match[1]);
+			$relDef = self::_getModelStaticProp($this->modelName,'hasMany');
 			if($relName === false)
 				throw new Exception("$className::$m unknown hasMany relation.");
 			if( count($a) !== 1 )
 				throw new Exception("$className::$m invalid count of parameters");
 			$collection = $a[0];
 			if(is_array($collection))
-				$collection = modelCollection::init($relName,$collection);
+				$collection = modelCollection::init($relDef[$relName]['modelName'],$collection);
 			elseif(! $collection instanceof modelCollection )
 				throw new Exception("$className::$m invalid parameter $collection given, modelCollection expected.");
 			$this->_manyModels[$relName] = $collection;
 			#- set la relation dans l'autre sens
-			$relDef = self::_getModelStaticProp($this->modelName,'hasMany');
 			if(! empty($relDef[$relName]['foreignField']) )
 				$this->_manyModels[$relName]->{$relDef[$relName]['foreignField']} = empty($relDef[$relName]['localField'])?$this->PK:$this->{$relDef[$relName]['localField']};
 			return $this; #- @todo make reflection on what should be return for now i thing that allowing method chaining can be nice
