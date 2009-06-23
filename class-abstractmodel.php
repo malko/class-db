@@ -11,7 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2009-06-22 - modelCollection::shuffle() doesn't automaticly loadDatas anymore.
+*            - 2009-06-23 - bug correction in _setDatas regarding setting unknown keys as collection
+*            - 2009-06-22 - modelCollection::shuffle() doesn't loadDatas anymore.
 *            - 2009-06-16 - bug correction on setting hasManyCollection on relations where relName was diffent from related modelName
 *            - 2009-06-12 - abstractmodel::getPagedModelInstances() suppress warning error on empty results sets
 *            - 2009-05-28 - now abstractmodel::_setDatas() can also set hasOne and hasMany relations
@@ -1851,7 +1852,7 @@ abstract class abstractModel{
 				continue;
 			if( isset($datasDefs[$k]) || isset($hasOne[$k]) ){
 				$this->$k = $v;
-			}else{
+			}elseif(isset($hasMany[$k])){
 				$this->{'set'.$k.'Collection'}($v);
 			}
 		}
