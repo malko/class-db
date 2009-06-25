@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-06-24 - modelCollection::htmlOptions() now use __toString to render label (so supporte more complex expression)
 *            - 2009-06-23 - bug correction in _setDatas regarding setting unknown keys as collection
 *            - 2009-06-22 - modelCollection::shuffle() doesn't loadDatas anymore.
 *            - 2009-06-16 - bug correction on setting hasManyCollection on relations where relName was diffent from related modelName
@@ -973,7 +974,7 @@ class modelCollection extends arrayObject{
 			if( isset($removedModels[$item->PK]) )
 				continue;
 			#- prepare label
-			$label  = empty($labelString)?"$item":preg_replace('!%('.$this->_datasKeyExp.')!ie','$item->\\1',$labelString);
+			$label  = empty($labelString)?"$item":$item->__toString($labelString);
 			if(is_array($selected))
 				$_selected = in_array($item->PK,$selected);
 			else
