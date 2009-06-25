@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-06-25 - better detection of ignored relationship on fields NO NULL with NULL as default
 *            - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
 *            - 2009-04-01 - $_avoidEmptyPK is now true by default
 *            - 2009-03-30 - add support for prefixed tables by adding new static properties $tablePrefixes and $excludePrefixedTables
@@ -156,7 +157,7 @@ class modelGenerator{
 								'localField'=>$fName,
 								#- ~ 'foreignField'=>$tbFields[$foreignTb]['PK'], // foreign Field is PK just ignore it
 							);
-							if( $fInfos['Default']!=='' || $fInfos['Null'] === 'YES'){
+							if( (! in_array($fInfos['Default'],array('',null),true)) || $fInfos['Null'] === 'YES'){
 								$hasOne['relType'] = "ignored";
 								$relDflt = $fInfos['Default']===''?null:$fInfos['Default'];
 							}else{
@@ -175,19 +176,20 @@ class modelGenerator{
 								'localField'=>$fName,
 								#- ~ 'foreignField'=>$tbFields[$foreignTb]['PK'], // foreign Field is PK just ignore it
 							);
-							if( $fInfos['Default']!=='' || $fInfos['Null'] === 'YES'){
+							if( (! in_array($fInfos['Default'],array('',null),true)) || $fInfos['Null'] === 'YES'){
 								$hasOne['relType'] = "ignored";
 								$relDflt = $fInfos['Default']===''?null:$fInfos['Default'];
 							}else{
 								$hasOne['relType'] = "dependOn";
 							}
 							$tbFields[$tb]['hasOne'][$fName] = $hasOne;
+						}else{
+							$foreignTb = false;
 						}
 					}
 
 					#- if we've found a hasOne map the corresponding hasOne or hasMany
 					if( $foreignTb && !empty($tbFields[$tb]['PK']) ){
-						#- ~ $tbFields[$foreignTb]['one2many'][$tb] = array($tbFields[$foreignTb]['PK'],$fName);
 						if($fInfos['Key'] === 'UNI' || $fInfos['Key'] === 'PRI'){
 							$tbFields[$foreignTb]['hasOne'][$tb] = array(
 								'modelName'   =>$tb,
@@ -239,7 +241,6 @@ class modelGenerator{
 				}
 			}
 		}
-
 		#- generate models
 		foreach($tbFields as $tbName=>$modelDesc)
 			$this->createModel($tbName,$modelDesc,$dbConnectionDefined,$prefix);
