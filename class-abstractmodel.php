@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-07-02 - bug correction on cascading deletes on hasOne relations that are not set
+*            - 2009-07-01 - new method abstractmodel::getModelLivingInstances() that return a modelCollection of all instanciated given model
+*                         - new method abstractmodel::getModelDummyInstance() that does exactly what it says
 *            - 2009-06-24 - modelCollection::htmlOptions() now use __toString to render label (so supporte more complex expression)
 *            - 2009-06-23 - bug correction in _setDatas regarding setting unknown keys as collection
 *            - 2009-06-22 - modelCollection::shuffle() doesn't loadDatas anymore.
@@ -1220,6 +1223,32 @@ abstract class abstractModel{
 		return $returnModel?self::$instances[strtolower($modelName)][$PK]:true;
 	}
 
+
+	/**
+	* This is not intended to be used by end users!!!
+	* The purpose of this method is to allow accessing an instance of an object with no datas or modelAddons connected to it.
+	* It's typically used for some modelAddons developpement or as internal method ( used by getModelDbAdapter for example )
+	* return abstractModel (no need to call detach as it's not "attached" at all )
+	*/
+	static public function getModelDummyInstance($modelName){
+		return new $modelName(null,true);
+	}
+	/**
+	* return a collection of all instanciated instances of a given model
+	* @param mixed $modelName string modelName or abstractModel instance of the given model.
+	* @return modelCollection
+	*/
+	static public function getModelLivingInstances($modelName){
+		if( $modelName instanceof abstractModel)
+			$modelName=$modelName->modelName;
+		$collection = modelCollection::init($modelName);
+		foreach(self::$instances as $instance){
+			if( $instance instanceof $modelName )
+				$collection[] = $model;
+		}
+		return $collection;
+	}
+
 	/**
 	* return unique abstractModel instance by primary key or a new empty one.
 	* @param string $modelName  model name
@@ -2059,10 +2088,7 @@ abstract class abstractModel{
 	static public function getModelDbAdapter($modelName){
 		if($modelName instanceof abstractModel)
 			return $modelName->dbAdapter;
-		$tmpModel = new $modelName(null,true);
-		$db = $tmpModel->dbAdapter;
-		self::destroy($tmpModel);
-		return $db;
+		return  abstractModel::getModelDummyInstance($modelName)->dbAdapter;
 	}
 	/**
 	* check if modelName has some related models definitions.
@@ -2317,9 +2343,12 @@ abstract class abstractModel{
 		foreach(self::_getModelStaticProp($this,'hasOne') as $relName=>$relDef){
 			switch($relDef['relType']){
 				case 'requiredBy': #- related require current so we delete it
-					$this->{$relName}->delete();
+					if(  $this->{$relName} instanceof $relDef['modelName'] ) #- ensure a related model exists before deleting it
+						$this->{$relName}->delete();
 					break;
 				case 'ignored':
+					if(! $this->{$relName} instanceof $relDef['modelName'] )
+						continue;
 					#- if we have a default value to set for ignored related we set it else we just ignore it
 					if(isset($relDef['foreignDefault']) && (! empty($relDef['foreignField'])) && ! $this->{$relName}->isTemporary()){
 						$this->{$relName}->{$relDef['foreignField']} = $relDef['foreignDefault'];
