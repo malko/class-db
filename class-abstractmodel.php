@@ -12,6 +12,8 @@
 *            - $HeadURL$
 * @changelog
 *            - 2009-07-02 - bug correction on cascading deletes on hasOne relations that are not set
+*                         - bug correction on abstractmodel::__get() on null values
+*                         - modelCollection now check for emptyPK at init time
 *            - 2009-07-01 - new method abstractmodel::getModelLivingInstances() that return a modelCollection of all instanciated given model
 *                         - new method abstractmodel::getModelDummyInstance() that does exactly what it says
 *            - 2009-06-24 - modelCollection::htmlOptions() now use __toString to render label (so supporte more complex expression)
@@ -233,10 +235,12 @@ class modelCollection extends arrayObject{
 		}
 		# ensure primaryKey consistency
 		$list = array();
+		$avoidEmptyPK = abstractModel::_getModelStaticProp($this->collectionType,'_avoidEmptyPK');
 		foreach($modelList as $v){
 			if($v instanceof $this->collectionType)
 				$list[$v->PK] = $v;
-			else
+			elseif( empty($v) && $avoidEmptyPK )
+				continue;
 				$list[$v] = $v;
 		}
 		parent::__construct($list,0,'modelCollectionIterator');
@@ -1640,7 +1644,7 @@ abstract class abstractModel{
 		if( isset($hasOne[$k]) || isset($hasMany[$k]) )
 			return $this->getRelated($k);
 		#- then check for datas values
-		if( isset($this->datas[$k]) )
+		if( isset($this->datasDefs[$k]) )
 				return $this->datas[$k];
 		#- then protected properties (make them kind of read only values)
 		if( isset($this->$k) )
@@ -2343,12 +2347,12 @@ abstract class abstractModel{
 		foreach(self::_getModelStaticProp($this,'hasOne') as $relName=>$relDef){
 			switch($relDef['relType']){
 				case 'requiredBy': #- related require current so we delete it
-					if(  $this->{$relName} instanceof $relDef['modelName'] ) #- ensure a related model exists before deleting it
+					if( $this->{$relName} instanceof $relDef['modelName'] ) #- ensure a related model exists before deleting it
 						$this->{$relName}->delete();
 					break;
 				case 'ignored':
 					if(! $this->{$relName} instanceof $relDef['modelName'] )
-						continue;
+						break;
 					#- if we have a default value to set for ignored related we set it else we just ignore it
 					if(isset($relDef['foreignDefault']) && (! empty($relDef['foreignField'])) && ! $this->{$relName}->isTemporary()){
 						$this->{$relName}->{$relDef['foreignField']} = $relDef['foreignDefault'];
