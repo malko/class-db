@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-07-08 - new modelCollection::slice() method
+*            - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
+*            - 2009-07-06 - bug correction in modelCollection::__construct() (forgotten continue)
 *            - 2009-07-02 - bug correction on cascading deletes on hasOne relations that are not set
 *                         - bug correction on abstractmodel::__get() on null values
 *                         - modelCollection now check for emptyPK at init time
@@ -237,10 +240,12 @@ class modelCollection extends arrayObject{
 		$list = array();
 		$avoidEmptyPK = abstractModel::_getModelStaticProp($this->collectionType,'_avoidEmptyPK');
 		foreach($modelList as $v){
-			if($v instanceof $this->collectionType)
+			if($v instanceof $this->collectionType){
 				$list[$v->PK] = $v;
-			elseif( empty($v) && $avoidEmptyPK )
 				continue;
+			}elseif( empty($v) && $avoidEmptyPK ){
+				continue;
+			}
 				$list[$v] = $v;
 		}
 		parent::__construct($list,0,'modelCollectionIterator');
@@ -655,6 +660,9 @@ class modelCollection extends arrayObject{
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
+	function slice($offset,$length=null){
+		return modelCollection::init($this->collectionType,array_slice($this->keys(),$offset,$length));
+	}
 
 	/**
 	* save models inside the collection and reset tmpKey if needed to avoid breaking key integrity
@@ -715,10 +723,17 @@ class modelCollection extends arrayObject{
 	* @return $this for method chaining
 	*/
 	function sort($sortBy,$sortType=null){
+		if( ! $this->count() )
+			return $this;
 		$this->_sortBy   = $sortBy;
 		$propDef = abstractModel::_getModelStaticProp($this->collectionType,'datasDefs');
-		if( empty($propDef[$sortBy]) )
-			throw new Exception('Try to sort an unsortable property');
+		if( empty($propDef[$sortBy]) ){
+			#- check for getter for this property
+			if(! $this->current()->_methodExists('get'.ucfirst($sortBy)) )
+				throw new Exception('Try to sort an unsortable property');
+			if( null === $sortType)
+				$sortType = 'std';
+		}
 		#- setting sorttype
 		if( is_null($sortType) ){ #- choose a default sortType according to datas type
 			$propDef = $propDef[$sortBy];
