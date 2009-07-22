@@ -368,8 +368,8 @@ class modelCollection extends arrayObject{
 		if( $value != $index)
 			throw new Exception("modelCollection::$this->collectionType try to get an offset with an invalid value.");
 		$model = abstractModel::getModelInstance($this->collectionType,$value);
-		if( $model ===false )
-			throw new Exception("modelCollection::$this->collectionType can't get instance for primariKey $value");
+		if( !$model instanceof $this->collectionType)
+			throw new Exception("modelCollection::$this->collectionType can't get instance for primaryKey $value");
 		$this->offsetSet($index,$model);
 		return $model;
 	}
