@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
 *            - 2009-07-08 - new modelCollection::slice() method
 *            - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
 *            - 2009-07-06 - bug correction in modelCollection::__construct() (forgotten continue)
@@ -395,8 +396,12 @@ class modelCollection extends arrayObject{
 		if( isset($hasOne[$k]) ){
 			$c = modelCollection::init($hasOne[$k]['modelName']);
 			$avoidEmptyPK = abstractModel::_getModelStaticProp($c->collectionType,'_avoidEmptyPK');
+			if( empty($hasOne[$k]['localField']) ){ //-- must be in presence of unique key field on foreign table
+				return abstractModel::_makeModelStaticCall($hasOne[$k]['modelName'],'getFilteredInstances',array('WHERE '.$hasOne[$k]['foreignField'].' IN (?)',$this->PK));
+			}else{
 			foreach($this->loadDatas() as $mk=>$m){
-				$c[] = ($avoidEmptyPK && empty($m->datas[$hasOne[$k]['localField']]))?$m->{$k}:$m->datas[$hasOne[$k]['localField']];
+					$c[] = ( $avoidEmptyPK && empty($m->datas[$hasOne[$k]['localField']]))?$m->{$k}:$m->datas[$hasOne[$k]['localField']];
+				}
 			}
 			return $c;
 		}
