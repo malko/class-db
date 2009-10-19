@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-10-01 - new modelCollection::isEmpty() method
 *            - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
 *            - 2009-07-08 - new modelCollection::slice() method
 *            - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
@@ -329,7 +330,7 @@ class modelCollection extends arrayObject{
 		if(! $this->count() )
 			return $chaining?$this:self::init($this->collectionType);
 		$temps = $this->getTemporaries();
-		$this->remove($temps);
+		$this->remove($temps->keys());
 		return $chaining?$this:$temps;
 	}
 	/**
@@ -629,6 +630,10 @@ class modelCollection extends arrayObject{
 		return $this;
 	}
 
+	/** check the collection is empty */
+	function isEmpty(){
+		return ($this->count()>0)?false:true;
+	}
 	/** return current model in collection @return abstractModel or null */
 	function current(){
 		if( count($this) < 1) return null;
@@ -1265,12 +1270,7 @@ abstract class abstractModel{
 	static public function getModelLivingInstances($modelName){
 		if( $modelName instanceof abstractModel)
 			$modelName=$modelName->modelName;
-		$collection = modelCollection::init($modelName);
-		foreach(self::$instances as $instance){
-			if( $instance instanceof $modelName )
-				$collection[] = $model;
-		}
-		return $collection;
+		return modelCollection::init($modelName,empty(self::$instances[strtolower($modelName)])?null:self::$instances[strtolower($modelName)]);
 	}
 
 	/**
@@ -1563,7 +1563,7 @@ abstract class abstractModel{
 			}else{ # foreignKey is primaryKey
 				$tmpModel = self::getModelInstance($relDef['modelName'],$localFieldVal);
 			}
-			if($tmpModel === false) # no related object was found in database create a new one
+			if(! $tmpModel instanceof abstractModel) # no related object was found in database create a new one
 				$tmpModel = self::getModelInstance($relDef['modelName']);
 			return $this->_oneModels[$relName] = $tmpModel;
 		}
