@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
+*            - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
+*            - 2009-10-26 - now __toString() allow escaping of % chars by a preceding backslash Or % (\%|%%)
 *            - 2009-10-01 - new modelCollection::isEmpty() method
 *            - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
 *            - 2009-07-08 - new modelCollection::slice() method
@@ -1025,7 +1028,7 @@ class modelCollection extends arrayObject{
 	* @param str $separator string separator between models
 	* @see abstractModel::__toString() for more infos
 	*/
-	public function __toString($formatStr=null,$separator=''){
+	public function _toString($formatStr=null,$separator=''){
 		$this->loadDatas();
 		$modelFormatStr = abstractModel::_getModelStaticProp($this->collectionType,'__toString');
 		$formatStr = null===$formatStr?$modelFormatStr:preg_replace('!%model(?=\W|$)!',$modelFormatStr,$formatStr);
@@ -1037,6 +1040,15 @@ class modelCollection extends arrayObject{
 		$str=implode($separator,$str);
 		$str = preg_replace(array('/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array("\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$str);
 		return eval('return<<<__TOSTRING'."\n$str\n__TOSTRING;\n");
+	}
+	//-- backward compatibility with older versions
+	public function __toString(){
+		if(! func_num_args() ){
+			return call_user_func(array($this,'_toString'));
+		}else{
+			$args = func_get_args();
+			return call_user_func_array(array($this,'_toString'),$args);
+		}
 	}
 }
 
@@ -1704,7 +1716,7 @@ abstract class abstractModel{
 				if(! $v instanceof $relModelName)
 					throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
 				$this->_oneModels[$k] = $v;
-				if(isset($this->datas[$localField]) && $localField !== $thisPrimaryKey)
+				if(isset($this->datasDefs[$localField]) && $localField !== $thisPrimaryKey)
 					$this->datas[$localField] = $v->PK;
 				return $v;
 			}
@@ -1746,7 +1758,7 @@ abstract class abstractModel{
 			$this->_manyModels[$k] = $v;
 		}*/
 
-		if(isset($this->datas[$k])){
+		if(isset($this->datasDefs[$k])){
 			$v = self::setModelDatasType($this,$k,$v);
 			if( $this->datas[$k] === $v ){
 				return $v;
@@ -1761,7 +1773,7 @@ abstract class abstractModel{
 	}
 
 	function __isset($k){
-		return isset($this->datas[$k]);
+		return isset($this->datasDefs[$k]);
 	}
 
 	/**
@@ -2477,11 +2489,16 @@ abstract class abstractModel{
 	*                          to display a litteral '%' character please just double it like '%%'
 	* @return string
 	*/
-	function __toString($formatStr=null){
+	function _toString($formatStr=null){
 		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
-		$string = preg_replace(array('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
+		$string = preg_replace(array('/(?<!%|\\\\)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%|\\\\)%{(.*?)}%(?!%)/s','![\\\\%]%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
 		return eval('return<<<__TOSTRING'."\n$string\n__TOSTRING;\n");
+	}
+	//-- backward compatibility with older versions
+	public function __toString(){
+		$formatStr = func_num_args()?func_get_arg(0):null;
+		return call_user_func(array($this,'_toString'),$formatStr);
 	}
 }
