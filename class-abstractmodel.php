@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-12-09 - add support for modelAddons::_initModelType
 *            - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
 *            - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
 *            - 2009-10-26 - now __toString() allow escaping of % chars by a preceding backslash Or % (\%|%%)
@@ -157,6 +158,7 @@ abstract class modelAddon{
 	protected $modelName     = null;
 	protected $dbAdapter     = null;
 	protected $overloadedModelMethods = array();
+	static private $_initializedModelType = array();
 	/**
 	* create an instance of modelAddon, it receive the modelInstance before any datas settings
 	* so it also receive the requested instance primaryKey.
@@ -167,10 +169,22 @@ abstract class modelAddon{
 		$this->modelInstance = $modelInstance;
 		$this->modelName     = abstractModel::_getModelStaticProp($this->modelInstance,'modelName');
 		$this->dbAdapter     = $this->modelInstance->dbAdapter;
+		$className = get_class($this);
+		if( method_exists($this,'_initModelType') && ! isset(self::$_initializedModelType["$className:$this->modelName"])){
+			$this->_initModelType();
+			self::$_initializedModelType["$className:$this->modelName"] = true;
+		}
 	}
 
 	/**
-	* check if a modelAddon handle or not a given method (sort of methods_exists but can handle dynamic methods such as thoose managed by __call (in such case must be declared in self::$overloadedModelMethods);
+	* optionnal _initModelType method may be defined and if exists will only be called once at first modelType instanciation
+	* it may be used to initialized some overloaded methods once by modelType.
+	* protected function _initModelType(){
+	*	}
+	*/
+
+	/**
+	* check if a modelAddon handle or not a given method (sort of method_exists but can handle dynamic methods such as thoose managed by __call (in such case must be declared in self::$overloadedModelMethods);
 	* @note to modelAddon developpers: when developping addon with dynamic overloaded methods, please consider using abstractModel::_setData() inside your ovveriden setter
 	*       and be sure to pass third parameter ($bypassFilters) to true if you want things to work like you expect. If you don't you'll probably end in unpredictable behaviour (such as infinite loop at setting time for example)
 	* @param string $methodname
@@ -2197,7 +2211,7 @@ abstract class abstractModel{
 	/**
 	* return a count of given model in database table.
 	* @param string $modelName model name you want count for
-	* @param array  $filters   same as conds in class-db permit you to count filtered models
+	* @param array  $filter   same as conds in class-db permit you to count filtered models
 	* @return int or false on error
 	*/
 	static public function getModelCount($modelName,$filter=null){

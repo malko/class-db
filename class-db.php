@@ -14,6 +14,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2009-12-14 - add some cleanup to profiler reports (htmlentities)
+*                         - new sliceAttrs (first|prev|next|last)Disabled + htmlentities replace default prev|next|first|last values
+*                         - replace verbose msgs by DIV instead of B tags
 *            - 2009-04-03 - add one level trace context information to dbProfiler reports
 *            - 2009-02-06 - add css class dbMsg to verbose messages
 *            - 2008-10-10 - new static property $_default_verbosity to set default beverbose value of any further new db instance
@@ -111,7 +114,11 @@ class dbProfiler{
 	}
 
 	function _prepareArgStr($a){
-		return var_export($a,1);
+		static $charset;
+		if(! $charset){
+			$charset = ini_get('default_charset');
+		}
+		return stripslashes(htmlentities(var_export($a,1),ENT_NOQUOTES,$charset));
 	}
 
 	static function printReport(){
@@ -124,7 +131,7 @@ class dbProfiler{
 			$rows[] = '<tr><td style="border-bottom:solid silver 1px;vertical-align:top;">'.$query.'</td><td style="border-bottom:solid silver 1px;vertical-align:top;"><i>'.$locInfo.'</i></td><td style="border-bottom:solid silver 1px;text-align:right;vertical-align:top;">'.$time.' sec</td></tr>';
 			$total += $time;
 		}
-		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;">
+		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;text-align:left;">
 		<caption style="text-align:left;font-weight:bold;cursor:pointer;" title="show / hide report details" onclick="var tb=this.parentNode;var disp=(tb.tBodies[0].style.display==\'none\'?\'table-row-group\':\'none\');tb.tBodies[0].style.display=disp;tb.tHead.style.display=disp; document.getElementById(\'dbProfilerButton\').innerHTML=(disp==\'none\'?\'&dArr;\':\'&uArr;\');"> <span id="dbProfilerButton" style="float:right;">&dArr;</span>dbProfiler report</caption>
 		<thead style="display:none;"><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
 		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
@@ -486,14 +493,16 @@ class db{
 			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$first);
 			$prev = str_replace('%lnk',str_replace('%page',$pageId-1,$linkStr),$prev);
 		}else{
-			$first = $prev = '';
+			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$firstDisabled);
+			$prev = str_replace('%lnk',str_replace('%page',$pageId-1,$linkStr),$prevDisabled);
 		}
 		# next/end link
 		if( $pageId < $nbpages ){
 			$last  = str_replace('%lnk',str_replace('%page',$nbpages,$linkStr),$last);
 			$next = str_replace('%lnk',str_replace('%page',$pageId+1,$linkStr),$next);
 		}else{
-			$last = $next = '';
+			$last  = str_replace('%lnk',str_replace('%page',$nbpages,$linkStr),$lastDisabled);
+			$next = str_replace('%lnk',str_replace('%page',$pageId+1,$linkStr),$nextDisabled);
 		}
 
 		# pages links
@@ -551,22 +560,24 @@ class db{
 		static $sliceAttrs;
 		if(! isset($sliceAttrs) ){
 			$sliceAttrs = array(
-				'first' => "<a href=\"%lnk\" class=\"pagelnk\"><<</a>",
-				'prev'  => "<a href=\"%lnk\" class=\"pagelnk\"><</a>",
-				'next'  => "<a href=\"%lnk\" class=\"pagelnk\">></a>",
-				'last'   => "<a href=\"%lnk\" class=\"pagelnk\">>></a>",
-				'pages'  => "<a href=\"%lnk\" class=\"pagelnk\">%page</a>",
+				'firstDisabled' => '',
+				'prevDisabled'  => '',
+				'nextDisabled'  => '',
+				'lastDisabled'  => '',
+				'first' => '<a href="%lnk" class="pagelnk"><big>&laquo;</big></a>',
+				'prev'  => '<a href="%lnk" class="pagelnk"><big>&lsaquo;</big></a>',
+				'next'  => '<a href="%lnk" class="pagelnk"><big>&rsaquo;</big></a>',
+				'last'  => '<a href="%lnk" class="pagelnk"><big>&raquo;</big></a>',
+				'pages' => '<a href="%lnk" class="pagelnk">%page</a>',
 				#- 'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
 				'curpage'  => '<input type="text" value="%page" onfocus="this.value=\'\';" onkeydown="if(event.keyCode==13){ var p=parseInt(this.value)||1;window.location=\'%lnk\'.replace(/page=%page/,\'page=\'+(p>%nbpages?%nbpages:(p<1?1:p)));return false;}" size="3" title="aller &agrave; la page" style="text-align:center;" />',
-				'linkStr'  => "?page=%page",
-				'linkSep'  => " ",
-				'formatStr'=> " %first %prev %5links %next %last"
+				'linkStr'  => '?page=%page',
+				'linkSep'  => ' ',
+				'formatStr'=> ' %first %prev %5links %next %last'
 			);
 		}
 		if( is_array($attrs) ){
-			foreach($sliceAttrs as $k=>$v){
-				$sliceAttrs[$k] = isset($attrs[$k])?$attrs[$k]:$v;
-			}
+			$sliceAttrs = array_merge($sliceAttrs,array_intersect_key($attrs,$sliceAttrs));
 		}
 		return $sliceAttrs;
 	}
@@ -778,11 +789,11 @@ class db{
 			if($isError){
 				if($useConsoleApp)
 					return console_app::msg_error($msg);
-				echo "<b style=\"color:red;\" class=\"dbMsg\">[ERROR] $msg</b><br />\n";
+				echo "<div style=\"color:red;font-weight:bold;\" class=\"dbMsg\">[ERROR] $msg</div>\n";
 			}else{
 				if($useConsoleApp)
 					return console_app::msg_info($msg);
-				echo "<b style=\"color:blue;\" class=\"dbMsg\">$msg</b><br />\n";
+				echo "<div style=\"color:blue;font-weight:bold;\" class=\"dbMsg\">$msg</div>\n";
 			}
 		}
 	}
