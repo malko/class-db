@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-01-04 - new db::insert_extended() method
 *            - 2009-12-14 - add some cleanup to profiler reports (htmlentities)
 *                         - new sliceAttrs (first|prev|next|last)Disabled + htmlentities replace default prev|next|first|last values
 *                         - replace verbose msgs by DIV instead of B tags
@@ -175,6 +176,10 @@ class db{
 		'selectCol'                => 'select_col',
 		'selectSlice'              => 'select_slice',
 		'selectValue'              => 'select_value',
+		'extendedInsert'           => 'insert_extended',
+		'insertExtended'           => 'insert_extended',
+		/** convenience aliases */
+		'extended_insert'          => 'insert_extended',
 	);
 
 	/**Db hostname*/
@@ -600,6 +605,38 @@ class db{
 			return FALSE;
 		$this->last_id = $this->last_insert_id();
 		return $return_id?$this->last_id:TRUE;
+	}
+	/**
+	* send an extended insert query to $table
+	* @param string $table
+	* @param array $values list of arr(FLD=>VALUE,)
+	* @param string|array $fields list of field names,
+	* 										        if null will use first values keys as field names if not numeric
+	*                             else will simply ignore the fields part of the query
+	* @return int affected_rows
+	*/
+	public function insert_extended($table,array $values,$fields=null){
+		if(null===$fields){
+			$fields = array_keys(reset($values));
+			#- cherck there's not only numeric values
+			$_fields = array_filter($fields,'is_int');
+			if( count($_fields) ===count($fields ))
+				$fields = null;
+		}
+		if( null !== $fields)
+			$fields = ' ('.$this->protect_field_names($fields).')';
+		foreach($values as $k=>$v)
+			$values[$k] = $this->prepare_smart_param($v);
+		$Q_str = "INSERT INTO $table$fields VALUES (".implode('),(',$values).")";
+
+		if(method_exists($this,'query_affected_rows')){
+			$res = $this->query_affected_rows($Q_str);
+			return ($res===FALSE || $res === -1)?FALSE:$res;
+		}else{
+			if(! $this->query($Q_str) )
+				return FALSE;
+			return count($values);
+		}
 	}
 	/**
 	* Send a delete query to $table
