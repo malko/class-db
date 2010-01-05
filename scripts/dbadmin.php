@@ -30,7 +30,7 @@
 *            - 2007-04-19 - start php5 port
 * @todo add a config file support
 */
-error_reporting(E_ALL);
+#- error_reporting(E_ALL);
 $working_dir = getcwd();
 chdir(dirname(__file__));
 require('libs/class-console_app.php');
@@ -427,7 +427,7 @@ master                            display the content of SQLITE_MASTER
 SQL statements                    perform a query on the database such as
                                   select, insert update or delete
 query: statements                 must be used for special commands such as
-                                  mysql set NAMES 
+                                  mysql set NAMES
 rehash,#                          refresh completion table
 
 ###--- Display settings ---###
