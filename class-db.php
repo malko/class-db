@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-02-01 - new db::show_table_primaryKey() method
 *            - 2010-01-04 - new db::insert_extended() method
 *            - 2009-12-14 - add some cleanup to profiler reports (htmlentities)
 *                         - new sliceAttrs (first|prev|next|last)Disabled + htmlentities replace default prev|next|first|last values
@@ -178,8 +179,11 @@ class db{
 		'selectValue'              => 'select_value',
 		'extendedInsert'           => 'insert_extended',
 		'insertExtended'           => 'insert_extended',
+		'getTablePK'               => 'show_table_primaryKey',
+		'getTablePrimaryKey'       => 'show_table_primaryKey',
 		/** convenience aliases */
 		'extended_insert'          => 'insert_extended',
+		'show_table_PK'            => 'show_table_primaryKey',
 	);
 
 	/**Db hostname*/
@@ -379,6 +383,22 @@ class db{
 
 	/** Verifier si cette methode peut s'appliquer a SQLite */
 	public function show_table_keys($table){}
+
+	/**
+	* return the field name of the given table primary key if exists
+	* @param string $table
+	* @return string or false
+	*/
+	public function show_table_primaryKey($table){
+		$res = $this->list_table_fields($table,true);
+		if( empty($res))
+			return false;
+		foreach($res as $v){
+			if( strpos($v['Key'],'PRI')===0)
+				return $v['Field'];
+		}
+		return false;
+	}
 
 	/**
 	* optimize table statement query

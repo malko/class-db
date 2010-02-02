@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-02-01 - first attempt for sqlitedb::show_table_keys() method implementation
 *            - 2008-04-06 - no more $mode parameter to construct the database (not managed by the extension at all so drop it)
 *                         - drop php4 support, and buffered query are no longer supported (was useless as db has it's own buffer)
 *                         - autoconnect is now a static property
@@ -205,8 +206,44 @@ class sqlitedb extends db{
 		return $ret;
 	}
 
-	/** Verifier si cette methode peut s'appliquer a SQLite * /
-	function show_table_keys($table){}
+	/** return informations about table indexes */
+	function show_table_keys($table){
+		$ids = $this->query_to_array('PRAGMA INDEX_LIST('.$table.')');
+		$res = array();
+		$fields = $this->list_table_fields($table,true);
+		foreach($fields as $k=>$v){
+			if( !empty($v['Key']) ){
+				$kname = $v['Key']==="PRIMARY"?$v['Key']:$k;
+				$unique = $v['Key']==="PRIMARY"?1:($v['Key']==="UNIQUE"?1:0);
+				$res[] = array(
+					'Table'=>$table,
+					'Key_name'  => $kname,
+					'name'      => $kname,
+					'unique'    => $unique,
+					'Non_unique'=> $unique?0:1,
+					'Column_name'=>$k,
+					'Null' => $v['Null'] === 'YES'?true:false
+				);
+			}
+		}
+		if( $ids ){
+			foreach($ids as $id){
+				$key = array(
+					'Table'=>$table,
+					'Key_name'=>$id['name'],
+					'name'=>$id['name'],
+					'unique'=> $id['unique'],
+					'Non_unique'=> $id['unique']?0:1,
+				);
+				$tmp = $this->query_to_array('PRAGMA INDEX_INFO('.$id['name'].')');
+				foreach($tmp as $idCol){
+					$res[] = array_merge($key,array('Column_name'=>$idCol['name'],'Null'=>$fields[$idCol['name']]['Null']==='YES'?true:false));
+				}
+			}
+		}
+		return $res;
+
+	}
 
 	/**
 	* optimize table statement query

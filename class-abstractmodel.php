@@ -417,7 +417,7 @@ class modelCollection extends arrayObject{
 			if( empty($hasOne[$k]['localField']) ){ //-- must be in presence of unique key field on foreign table
 				return abstractModel::_makeModelStaticCall($hasOne[$k]['modelName'],'getFilteredInstances',array('WHERE '.$hasOne[$k]['foreignField'].' IN (?)',$this->PK));
 			}else{
-			foreach($this->loadDatas() as $mk=>$m){
+				foreach($this->loadDatas() as $mk=>$m){
 					$c[] = ( $avoidEmptyPK && empty($m->datas[$hasOne[$k]['localField']]))?$m->{$k}:$m->datas[$hasOne[$k]['localField']];
 				}
 			}
