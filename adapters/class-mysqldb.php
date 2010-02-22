@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-02-22 - now error on select_db at open/check_connection('active') time will return false
 *            - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
 *                           $setNamesOnSelectDb if both are null then nothing will happen else it will perform
 *                           a SET NAMES query on the selected database.
@@ -112,7 +113,10 @@ class mysqldb extends db{
 						return FALSE;
 					}
 					$this->verbose("connection to $this->host established",__FUNCTION__,2);
-					$this->select_db();
+					if( false === $this->select_db()){
+						$this->close();
+						return false;
+					}
 					return mysql_get_host_info($this->conn);
 					break;
 			}
