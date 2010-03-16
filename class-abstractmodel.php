@@ -11,11 +11,13 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-03-16 - add use of db::protect_field_names() method in many places
 *            - 2009-12-09 - add support for modelAddons::_initModelType
 *            - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
 *            - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
 *            - 2009-10-26 - now __toString() allow escaping of % chars by a preceding backslash Or % (\%|%%)
 *            - 2009-10-01 - new modelCollection::isEmpty() method
+*            - 2009-09-30 - now abstractmodel::getRelated() check for living instance when getting hasOne relation on foreign unique key
 *            - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
 *            - 2009-07-08 - new modelCollection::slice() method
 *            - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
@@ -439,14 +441,14 @@ class modelCollection extends arrayObject{
 			if(! empty($relDef['linkTable']) ){
 				$lField = $relDef['linkLocalField'];
 				$fField = $relDef['linkForeignField'];
-				$links = $db->select_rows($relDef['linkTable'],'*',array("WHERE $lField IN (?)",$this->PK));
+				$links = $db->select_rows($relDef['linkTable'],'*',array('WHERE '.$db->protect_field_names($lField).' IN (?)',$this->PK));
 			}else{
-				$lKey        = empty($relDef['localField'])?abstractModel::_getModelStaticProp($this->collectionType,'primaryKey') :$relDef['localField'] ;
-				$lField      = $relDef['foreignField'];
-				$lTable      = abstractModel::_getModelStaticProp($this->collectionType,'tableName');
-				$fTable      = abstractModel::_getModelStaticProp($relDef['modelName'],'tableName');
-				$fField      = abstractModel::_getModelStaticProp($relDef['modelName'],'primaryKey');
-				$links = $db->select_rows("$fTable","$fField,$lField",array("WHERE $lField IN (?)",$this->{$lKey}));
+				$lKey   = empty($relDef['localField'])?abstractModel::_getModelStaticProp($this->collectionType,'primaryKey') :$relDef['localField'] ;
+				$lField = $relDef['foreignField'];
+				$lTable = abstractModel::_getModelStaticProp($this->collectionType,'tableName');
+				$fTable = abstractModel::_getModelStaticProp($relDef['modelName'],'tableName');
+				$fField = abstractModel::_getModelStaticProp($relDef['modelName'],'primaryKey');
+				$links  = $db->select_rows("$fTable","$fField,$lField",array('WHERE '.$db->protect_field_names($lField).' IN (?)',$this->{$lKey}));
 			}
 			if(! $links)
 				return $c;
@@ -629,7 +631,7 @@ class modelCollection extends arrayObject{
 			$primaryKey = abstractModel::_getModelStaticProp($this->collectionType,'primaryKey');
 			if($limit>0)
 				$needLoad = array_slice($needLoad,0,$limit);
-			$rows = $db->select_rows($tb,'*',array("WHERE $primaryKey IN (?)",$needLoad));
+			$rows = $db->select_rows($tb,'*',array('WHERE '.$db->protect_field_names($primaryKey).' IN (?)',$needLoad));
 			if( empty($rows) ) #- @todo musn't append so certainly have to throw an exception ??
 				return $this;
 			foreach($rows as $row){
@@ -1023,7 +1025,7 @@ class modelCollection extends arrayObject{
 			if( isset($removedModels[$item->PK]) )
 				continue;
 			#- prepare label
-			$label  = empty($labelString)?"$item":$item->__toString($labelString);
+			$label  = empty($labelString)?"$item":$item->_toString($labelString);
 			if(is_array($selected))
 				$_selected = in_array($item->PK,$selected);
 			else
@@ -1333,7 +1335,11 @@ abstract class abstractModel{
 			return $instance;
 		}
 		#- finally if we're there get datas from db and set them
-		$instance->datas = $instance->dbAdapter->select_single_to_array(self::_getModelStaticProp($instance,'tableName'),'*',array("WHERE $primaryKey = ?",$PK));
+		$instance->datas = $instance->dbAdapter->select_single_to_array(
+			self::_getModelStaticProp($instance,'tableName'),
+			'*',
+			array('WHERE '.$instance->dbAdapter->protect_field_names($primaryKey).' = ?',$PK)
+		);
 		if( false === $instance->datas) #- error no datas in database
 			return null;
 		$instance->setModelDatasTypes();
@@ -1462,10 +1468,11 @@ abstract class abstractModel{
 			throw new Exception(__class__.'::'.__function__.'() invalid parameter field('.$field.')  must be one of a valid datas fieldName.');
 		if(! is_array($args) )
 			$args = array($args);
+		$field = abstractModel::getModelDbAdapter($modelName)->protect_field_names($field);
 		if($filterType==='Between')
-			$filter = 'WHERE '.$field.' BETWEEN ? AND ?';
+			$filter = "WHERE $field  BETWEEN ? AND ?";
 		else
-			$filter = 'WHERE '.$field.' '.$filterTypes[$filterType];
+			$filter = "WHERE $field ".$filterTypes[$filterType];
 		if(substr($filterType,-2)==='In')
 			$args = array($args);
 		array_unshift($args,$filter);
@@ -1557,7 +1564,7 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$db = self::getModelDbAdapter($modelName);
-		$PKExists     = $db->select_value($tableName,$primaryKey,array("WHERE $primaryKey=?",$PK));
+		$PKExists     = $db->select_value($tableName,$primaryKey,array('WHERE '.$db->protect_field_names($primaryKey).'=?',$PK));
 		return $valids[$modelName][$PK]=$PKExists?true:false;
 	}
 
@@ -1585,7 +1592,17 @@ abstract class abstractModel{
 			$localFieldVal = $this->datas[$relDef['localField']];
 			if( (! empty($relDef['foreignField'])) && $relDef['foreignField'] !== self::_getModelStaticProp($relDef['modelName'],'primaryKey') ){
 				# foreignKey is not primaryKey so we must get it throught filteredInstances
-				$tmpModel = self::getFilteredModelInstance($relDef['modelName'],array("WHERE $relDef[foreignField]=? LIMIT 0,1",$localFieldVal));
+				$tmpCollection = self::getModelLivingInstances($relDef['modelName']);
+				$tmpCollection=$tmpCollection->filterBy($relDef['foreignField'],$localFieldVal);
+				if($tmpCollection->count()){
+					$tmpModel = $tmpCollection->current();
+				}
+				if(!isset($tmpModel)){
+					$tmpModel = self::getFilteredModelInstance(
+						$relDef['modelName'],
+						array('WHERE '.abstractModel::getModelDbAdapter($relDef['modelName'])->protect_field_names($relDef['foreignField']).'=? LIMIT 0,1',$localFieldVal)
+					);
+				}
 			}else{ # foreignKey is primaryKey
 				$tmpModel = self::getModelInstance($relDef['modelName'],$localFieldVal);
 			}
@@ -1611,16 +1628,20 @@ abstract class abstractModel{
 
 			$localFieldVal = $this->datas[$relDef['localField']];
 			if( empty($relDef['linkTable']) ){
+				$dbAdapter = abstractModel::getModelDbAdapter($relDef['modelName']);
 				return $this->_manyModels[$relName] = abstractModel::getFilteredModelInstances(
 					$relDef['modelName'],
-					array("WHERE $relDef[foreignField] =?".(empty($relDef['orderBy'])?'':" ORDER BY $relDef[orderBy]"),$localFieldVal)
+					array(
+						'WHERE '.$dbAdapter->protect_field_names($relDef['foreignField']).' =?'.(empty($relDef['orderBy'])?'':' ORDER BY '.$dbAdapter->protect_field_names($relDef['orderBy'])),
+						$localFieldVal
+					)
 				);
 			}else{
 				if( empty($relDef['orderBy']) ){
 					$PKs = $this->dbAdapter->select_col(
 						$relDef['linkTable'],
 						$relDef['linkForeignField'],
-						array("WHERE $relDef[linkLocalField]=?",$localFieldVal)
+						array('WHERE '.$this->dbAdapter->protect_field_names($relDef['linkLocalField']).'=?',$localFieldVal)
 					);
 				}else{
 					$relTable      = self::_getModelStaticProp($relDef['modelName'],'tableName');
@@ -1628,7 +1649,12 @@ abstract class abstractModel{
 					$PKs = $this->dbAdapter->select_col(
 						"$relDef[linkTable] LEFT JOIN $relTable ON $relDef[linkTable].$relDef[linkForeignField] = $relTable.$relPrimaryKey",
 						$relDef['linkForeignField'],
-						array("WHERE $relDef[linkTable].$relDef[linkLocalField]=? ORDER BY $relDef[orderBy]",$localFieldVal)
+						array(
+							'WHERE '.$this->dbAdapter->protect_field_names($relDef['linkTable']).'.'
+							.$this->dbAdapter->protect_field_names($relDef['linkLocalField'])
+							.'=? ORDER BY '.$this->dbAdapter->protect_field_names($relDef['orderBy']),
+							$localFieldVal
+						)
 					);
 				}
 				return $this->_manyModels[$relName] = abstractModel::getMultipleModelInstances($relDef['modelName'],empty($PKs)?array():$PKs);
@@ -2099,6 +2125,7 @@ abstract class abstractModel{
 	*/
 	static public function modelCheckFieldDatasExists($modelName,$fieldName,$value,$returnInstance=false,$ignoredPK=null){
 		$db = self::getModelDbAdapter($modelName);
+		$fieldName = $db->protect_field_names($fieldName);
 		$w = array("WHERE $fieldName = ?",$value);
 		if($ignoredPK!==null){
 			if( $ignoredPK instanceof modelCollection)
@@ -2329,7 +2356,7 @@ abstract class abstractModel{
 			$tableName = self::_getModelStaticProp($this,'tableName');
 			unset($datas[$primaryKey]); # update all but primaryKey
 			if(! $this->isTemporary() ){ # update
-				if( false === $this->dbAdapter->update($tableName,$datas,array("WHERE $primaryKey=?",$PK)) )
+				if( false === $this->dbAdapter->update($tableName,$datas,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$PK)) )
 					throw new Exception(get_class($this)." Error while updating (PK=$PK).");
 			}else{ # insert
 				# check for user define primaryKey generation
@@ -2355,7 +2382,7 @@ abstract class abstractModel{
 		#- the linked part may certainly be optimized for better performance but this should work for now
 		foreach($linked as $relName=>$relDef){
 			$related = $this->getRelated($relName);
-			$needOptimize = $this->dbAdapter->delete($relDef['linkTable'],array("WHERE $relDef[linkLocalField]=?",$this->PK));
+			$needOptimize = $this->dbAdapter->delete($relDef['linkTable'],array('WHERE '.$this->dbAdapter->protect_field_names($relDef['linkLocalField']).'=?',$this->PK));
 			foreach($related as $m){
 				$m->save();
 				$ldata = array(
@@ -2415,7 +2442,7 @@ abstract class abstractModel{
 		foreach(self::_getModelStaticProp($this,'hasMany') as $relName=>$relDef){
 			#- first manage thoose who use a linkTable in this case we just delete links
 			if( ! empty($relDef['linkTable']) ){
-				$this->dbAdapter->delete($relDef['linkTable'],array("WHERE $relDef[linkLocalField]=?",$this->PK));
+				$this->dbAdapter->delete($relDef['linkTable'],array('WHERE '.$this->dbAdapter->protect_field_names($relDef['linkLocalField']).'=?',$this->PK));
 				continue;
 			}
 			#- then manage many related with no linkTable
@@ -2440,7 +2467,7 @@ abstract class abstractModel{
 		}//*/
 		$tableName  = self::_getModelStaticProp($this,'tableName');
 		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-		$res = $this->dbAdapter->delete($tableName,array("WHERE $primaryKey=?",$this->PK));
+		$res = $this->dbAdapter->delete($tableName,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$this->PK));
 		if($res===false)
 			throw new Exception(get_class($this)."::delete() Error while deleting.");
 		$this->deleted = true;
