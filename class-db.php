@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-03-24 - add optional parameter $fullSliceAttrs to select_slice() method
 *            - 2010-02-01 - new db::show_table_primaryKey() method
 *            - 2010-01-04 - new db::insert_extended() method
 *            - 2009-12-14 - add some cleanup to profiler reports (htmlentities)
@@ -502,14 +503,14 @@ class db{
 	/**
 	* @return array  array((array) results,(str) navigationstring, (int) totalrows)
 	*/
-	public function select_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10){
+	public function select_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10,$fullSliceAttrs=null){
 		$conds = $this->process_conds($conds);
 		if(! ($tot = $this->select_value($table,'count(*)',$conds) ) )
 			return FALSE;
 		$limitStart = (int) $pageNbRows * ($pageId-1);
 		$res = $this->select_rows($table,$fields,$conds." Limit $limitStart,$pageNbRows");
 		# now prepare navigation links
-		$attrs = $this->set_slice_attrs();
+		$attrs = (null==$fullSliceAttrs?$this->set_slice_attrs():$fullSliceAttrs);
 		extract($attrs);
 		$nbpages = ceil($tot/max(1,$pageNbRows));
 
