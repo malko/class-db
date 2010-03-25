@@ -11,7 +11,10 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2010-03-16 - add use of db::protect_field_names() method in many places
+*            - 2010-03-24 - change abstractmodel::_setPagedNav() methods to use abstractmodel::$internals
+*                         - correct typo error when setting internal has*KeyExp
+*                         - new modelCollection::paged() method
+*            - 2010-03-16 - add use of db::protect_field_names() method at many places
 *            - 2009-12-09 - add support for modelAddons::_initModelType
 *            - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
 *            - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
@@ -693,6 +696,64 @@ class modelCollection extends arrayObject{
 		return modelCollection::init($this->collectionType,array_slice($this->keys(),$offset,$length));
 	}
 
+	
+	function paged($pageId=1,$pageSize=10){
+		$total = $this->count();
+		if( $total === 0 )
+			return array(self::init($this->collectionType),'',0);
+		$c = $this->slice($pageSize*($pageId-1),$pageSize);
+		$nbpages = ceil($total/max(1,$pageSize));
+		$modelPagedNav = abstractModel::_setModelPagedNav($this->collectionType);
+		extract($modelPagedNav);
+
+		# start/prev link
+		if($nbpages > 1 && $pageId != 1){
+			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$first);
+			$prev = str_replace('%lnk',str_replace('%page',$pageId-1,$linkStr),$prev);
+		}else{
+			$first = str_replace('%lnk',str_replace('%page',1,$linkStr),$firstDisabled);
+			$prev = str_replace('%lnk',str_replace('%page',$pageId-1,$linkStr),$prevDisabled);
+		}
+		# next/end link
+		if( $pageId < $nbpages ){
+			$last  = str_replace('%lnk',str_replace('%page',$nbpages,$linkStr),$last);
+			$next = str_replace('%lnk',str_replace('%page',$pageId+1,$linkStr),$next);
+		}else{
+			$last  = str_replace('%lnk',str_replace('%page',$nbpages,$linkStr),$lastDisabled);
+			$next = str_replace('%lnk',str_replace('%page',$pageId+1,$linkStr),$nextDisabled);
+		}
+
+		# pages links
+		if(preg_match('!%(\d+)?links!',$formatStr,$m)){
+			$nblinks = isset($m[1])?$m[1]:'';
+			if(! $nblinks){ # all pages links
+				$slideStart = 1;
+				$slideEnd   = $nbpages;
+			}else{ # range pages link
+				$delta      = $nblinks%2?($nblinks-1)/2:$nblinks/2;
+				$slideStart = max(1,$pageId - $delta - (($pageId+$delta)<=$nbpages?0: $pageId -($nbpages-$delta)) );
+				$slideEnd   = min($nbpages,$pageId + $delta + ($pageId > $delta?0: $delta - $pageId + 1 ) );
+			}
+			for($i=$slideStart;$i<=$slideEnd;$i++){
+				$pageLinks[] = str_replace(
+					array('%lnk','%page'),
+					array(str_replace('%page',$i,$linkStr),$i),
+					($i==$pageId?$curpage:$pages)
+				);
+			}
+
+			$links = implode($linkSep,$pageLinks);
+		}
+
+		$formatStr = str_replace(
+			array('%first','%prev','%next','%last','%'.$nblinks.'links','%tot','%nbpages','%page'),
+			array($first,$prev,$next,$last,$links,$total,$nbpages,$pageId),
+			$formatStr
+		);
+
+
+		return array($c,$formatStr,$total);
+	}
 	/**
 	* save models inside the collection and reset tmpKey if needed to avoid breaking key integrity
 	*/
@@ -1164,7 +1225,22 @@ abstract class abstractModel{
 	* just a place to keep some various internal datas to avoid of preparing them more than once
 	* (for exemples some regexps inside magic methods)
 	*/
-	static private $_internals = array();
+	static private $_internals = array('_pagedNav'=>array());
+	static public $_pagedNavDefault = array(
+		'firstDisabled' => '',
+		'prevDisabled'  => '',
+		'nextDisabled'  => '',
+		'lastDisabled'  => '',
+		'first' => '<a href="%lnk" class="pagelnk"><big>&laquo;</big></a>',
+		'prev'  => '<a href="%lnk" class="pagelnk"><big>&lsaquo;</big></a>',
+		'next'  => '<a href="%lnk" class="pagelnk"><big>&rsaquo;</big></a>',
+		'last'  => '<a href="%lnk" class="pagelnk"><big>&raquo;</big></a>',
+		'pages' => '<a href="%lnk" class="pagelnk">%page</a>',
+		'curpage'  => "<b><a href=\"%lnk\" class=\"pagelnk\">%page</a></b>",
+		'linkStr'  => '/%modelName/list/page/%page',
+		'linkSep'  => ' ',
+		'formatStr'=> ' %first %prev %5links %next %last'
+	);
 
 	/**
 	* use dbProfiler to encapsulate db instances (used for debug and profiling purpose)
@@ -1230,7 +1306,7 @@ abstract class abstractModel{
 		foreach(array_keys(self::_getModelStaticProp($this,'hasMany')) as $k)
 			$manyKeys[] = '['.$k[0].strtoupper($k[0]).']'.substr($k,1);
 		self::$_internals[get_class($this)]['hasManyKeyExp'] = implode('|',$manyKeys);
-		self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasManyKeyExp']
+		self::$_internals[get_class($this)]['has*KeyExp'] = self::$_internals[get_class($this)]['hasOneKeyExp']
 			.((count($oneKeys)&&count($manyKeys))?'|':'')
 			.self::$_internals[get_class($this)]['hasManyKeyExp'];
 		#- prepare datas keys exp
@@ -1514,7 +1590,7 @@ abstract class abstractModel{
 	static public function getPagedModelInstances($modelName,$filter=null,$pageId=1,$pageSize=10,$withRelated=null){
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$db = self::getModelDbAdapter($modelName);
-		$rows = $db->select_slice($tableName,'*',$filter,$pageId,$pageSize);
+		$rows = $db->select_slice($tableName,'*',$filter,$pageId,$pageSize,self::_setModelPagedNav($modelName));
 		$collection = modelCollection::init($modelName);
 		if( $rows === false )
 			return array($collection,'',0);
@@ -1533,8 +1609,19 @@ abstract class abstractModel{
 	* @see db::set_slice_attrs for more info
 	* @return array() sliceAttrs (full attrs)
 	*/
-	static public function _setModelPagedNav($modelName,$sliceAttrs=null){
-		return self::getModelDbAdapter($modelName)->set_slice_attrs($sliceAttrs);
+	static public function _setModelPagedNav($modelName,array $sliceAttrs=null){
+		if( null !== $sliceAttrs){
+			$sliceAttrs = array_merge(self::$_pagedNavDefault,array_intersect_key($sliceAttrs,self::$_pagedNavDefault));
+		}else{
+			if( ! empty(self::$_internals['_pagedNav'][$modelName]) ){
+				return self::$_internals['_pagedNav'][$modelName];
+			}else{
+				$sliceAttrs = self::$_pagedNavDefault;
+			}
+		}
+		foreach($sliceAttrs as &$v)
+			$v = str_replace('%modelName',$modelName,$v);
+		return self::$_internals['_pagedNav'][$modelName] = $sliceAttrs;
 	}
 
 	/**
@@ -1632,7 +1719,7 @@ abstract class abstractModel{
 				return $this->_manyModels[$relName] = abstractModel::getFilteredModelInstances(
 					$relDef['modelName'],
 					array(
-						'WHERE '.$dbAdapter->protect_field_names($relDef['foreignField']).' =?'.(empty($relDef['orderBy'])?'':' ORDER BY '.$dbAdapter->protect_field_names($relDef['orderBy'])),
+						'WHERE '.$dbAdapter->protect_field_names($relDef['foreignField']).' =?'.(empty($relDef['orderBy'])?'':' ORDER BY '.$relDef['orderBy']),
 						$localFieldVal
 					)
 				);
@@ -1652,7 +1739,7 @@ abstract class abstractModel{
 						array(
 							'WHERE '.$this->dbAdapter->protect_field_names($relDef['linkTable']).'.'
 							.$this->dbAdapter->protect_field_names($relDef['linkLocalField'])
-							.'=? ORDER BY '.$this->dbAdapter->protect_field_names($relDef['orderBy']),
+							.'=? ORDER BY '.$relDef['orderBy'],
 							$localFieldVal
 						)
 					);

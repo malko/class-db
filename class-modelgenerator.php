@@ -417,7 +417,7 @@ class BASE_$modelName extends abstractModel{
 	static public function getPagedInstances(\$filter=null,\$pageId=1,\$pageSize=10,\$withRelated=null){
 		return abstractModel::getPagedModelInstances('$modelName',\$filter,\$pageId,\$pageSize,\$withRelated);
 	}
-	static public function _setPagedNav(\$sliceAttrs){
+	static public function _setPagedNav(array \$sliceAttrs=null){
 		return abstractModel::_setModelPagedNav('$modelName',\$sliceAttrs);
 	}
 	static public function _getSupportedAddons(){
