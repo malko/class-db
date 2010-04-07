@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-04-07 - new method modelCollection::merge
+*                         - modelCollection::append() now return $this for method chaining and support appending a whole collection
 *            - 2010-03-24 - change abstractmodel::_setPagedNav() methods to use abstractmodel::$internals
 *                         - correct typo error when setting internal has*KeyExp
 *                         - new modelCollection::paged() method
@@ -298,15 +300,27 @@ class modelCollection extends arrayObject{
 		return new modelCollectionIterator($this);
 	}
 
+	/**
+	* append a single collectionType model instance or a full modelCollection of same collectionType
+	* @param mixed value abstractModel or modelCollection to append to the current modelCollection
+	* @return $this for method chaining
+	*/
 	function append($value){
+		if( $value instanceof modelCollection && $value->collectionType === $this->collectionType){
+			foreach($value->keys() as $i){
+				$this[] = $i;
+			}
+			return $this;
+		}
 		if(! $value instanceof $this->collectionType)
 			throw new Exception("modelCollection::$this->collectionType can only append $this->collectionType models");
 		$index=$value->PK;
-		return $this->offsetSet($index, $value);
+		$this->offsetSet($index, $value);
+		return $this;
 	}
 	/**
 	* create a new abstractModel matching $this->collectionType and append it to the collection
-	* @return abstractModel
+	* @return new abstractModel
 	*/
 	function appendNew(){
 		$m = abstractModel::getModelInstance($this->collectionType);
@@ -372,7 +386,7 @@ class modelCollection extends arrayObject{
 			if($index===null) #- @todo check that value can be a primaryKey for this type of instance
 				$index = $value;
 			elseif( $index !== $value)
-				throw new Exception("modelCollection::$this->collectionType keys must match values primaryKey ($index !== $value->PK)");
+				throw new UnexpectedValueException("modelCollection::$this->collectionType keys must match values primaryKey ($index !== $value->PK)");
 			return parent::offsetSet($index, $value);
 			#- ~ if(! $value instanceof $this->collectionType)
 				#- ~ throw new Exception("modelCollection::$this->collectionType can only have $this->collectionType models");
@@ -380,7 +394,7 @@ class modelCollection extends arrayObject{
 		if( $index===null)
 			$index=$value->PK;
 		elseif($index != $value->PK)
-			throw new Exception("modelCollection::$this->collectionType keys must match values primaryKey ($index !== $value->PK)");
+			throw new UnexpectedValueException("modelCollection::$this->collectionType keys must match values primaryKey ($index !== $value->PK)");
 		return parent::offsetSet($index, $value);
 	}
 
@@ -390,12 +404,26 @@ class modelCollection extends arrayObject{
 			return $value;
 
 		if( $value != $index)
-			throw new Exception("modelCollection::$this->collectionType try to get an offset with an invalid value.");
+			throw new OutOfBoundsException("modelCollection::$this->collectionType try to get an offset with an invalid value.");
 		$model = abstractModel::getModelInstance($this->collectionType,$value);
 		if( !$model instanceof $this->collectionType)
-			throw new Exception("modelCollection::$this->collectionType can't get instance for primaryKey $value");
+			throw new OutOfBoundsException("modelCollection::$this->collectionType can't get instance for primaryKey $value");
 		$this->offsetSet($index,$model);
 		return $model;
+	}
+	/**
+	* append the given collection to the current one.
+	* @param mixed $collection may be a modelCollection of same modelType or a list of PK for the same model
+	* @return new modelCollection
+	*/
+	function merge($collection){
+		if( (! is_array($collection) ) && ! ($collection instanceof modelCollection && $collection->collectionType===$this->collectionType) ){
+			throw new InvalidArgumentException("modelCollection::$this->collectionType invalid merge parameter");
+		}
+		if( ! is_array($collection)){
+			$collection = $collection->keys();
+		}
+		return modelCollection::init($this->collectionType,array_merge($this->keys(),$collection));
 	}
 
 	###--- SPECIFIC MODELCOLLECTION METHODS ---###
