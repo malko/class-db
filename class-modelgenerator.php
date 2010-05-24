@@ -502,7 +502,13 @@ class $modelName extends BASE_$modelName{
 	* if true then the model can't have an empty primaryKey value (empty as in php empty() function)
 	* so passing an empty PrimaryKey at getInstance time will result to be equal to a getNew call
 	*/
-	static protected \$_avoidEmptyPK = true;"
+	static protected \$_avoidEmptyPK = true;
+	/**
+	* Make use $modelName::\$_hasOne and/or $modelName::\$_hasMany if you want to override thoose defined in BASE_$modelName
+	* any key set to an empty value will be dropped, others will be appended if not exists or override if exists
+	* static protected \$_hasOne = array();
+	* static protected \$_hasMany = array();
+	*/"
 	.(empty($methods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$methods)).
 	"
 }

@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-05-20 - litle enhancement of trace display in dbProfiler::printReport()
 *            - 2010-03-24 - add optional parameter $fullSliceAttrs to select_slice() method
 *            - 2010-02-01 - new db::show_table_primaryKey() method
 *            - 2010-01-04 - new db::insert_extended() method
@@ -69,6 +70,7 @@ class dbProfiler{
 	static public $precision = 4;
 
 	static public $stats     = array();
+	static public $traceMaxDepth  = 5;
 	protected $db            = null;
 	protected $statFuncs     = null;
 
@@ -90,18 +92,25 @@ class dbProfiler{
 			return call_user_func_array(array($this->db,$m),$a);
 		# - get stat on queries
 		$trace = debug_backtrace();
-		if(! isset($trace[2])){
-			$traceContext='';
-		}else{
-			if(empty($trace[2]['type']))
-				$traceContextObject = '';
-			else
-				$traceContextObject = (($trace[2]['type']=='::'?$trace[2]['class']:get_class($trace[2]['object'])).$trace[2]['type']);
-			$traceContext = $traceContextObject.$trace[2]['function'].'(...)'.(isset($trace[2]['file'])?' in '.basename($trace[2]['file']).' ('.$trace[2]['line'].')':'');
+		$traceContext = array();
+		$maxDepth = self::$traceMaxDepth+2;
+		for($i=2; $i < $maxDepth;$i++){
+			if( ! isset($trace[$i]))
+				break;
+			if( isset($trace[$i])){
+				if(! empty($trace[$i]['type']))
+					$traceContextObject = (($trace[$i]['type']=='::'?$trace[$i]['class']:get_class($trace[$i]['object'])).$trace[$i]['type']);
+				$traceContext[] = $traceContextObject.$trace[$i]['function'].'(...)'.(isset($trace[$i]['file'])?' in '.basename($trace[$i]['file']).' ('.$trace[$i]['line'].')':'');
+			}
 		}
+		$traceContext = implode('<br />',$traceContext);
 		$trace = basename($trace[1]['file']).' ('.$trace[1]['line'].')';
-		if(! empty($traceContext) )
-			$trace = "<abbr title=\"$traceContext\">$trace</abbr>";
+		if(! empty($traceContext) ){
+			#- $trace = "<abbr title=\"$traceContext\">$trace</abbr>";
+			$trace = '<div style="position:relative;" onmouseover="this.children[0].style.display=\'block\';" onmouseout="this.children[0].style.display=\'none\';">'
+				.$trace.'<div style="display:none;position:absolute;background:#ffe;z-index:1;border:solid #555 1px;right:0;top:0;white-space:nowrap;padding:.2em;color:#000;">'
+				.$traceContext.'</div></div>';
+		}
 		$stat = array(
 			$trace,
 			"<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',
@@ -134,7 +143,7 @@ class dbProfiler{
 			$rows[] = '<tr><td style="border-bottom:solid silver 1px;vertical-align:top;">'.$query.'</td><td style="border-bottom:solid silver 1px;vertical-align:top;"><i>'.$locInfo.'</i></td><td style="border-bottom:solid silver 1px;text-align:right;vertical-align:top;">'.$time.' sec</td></tr>';
 			$total += $time;
 		}
-		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;text-align:left;">
+		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;text-align:left;position:relative;">
 		<caption style="text-align:left;font-weight:bold;cursor:pointer;" title="show / hide report details" onclick="var tb=this.parentNode;var disp=(tb.tBodies[0].style.display==\'none\'?\'table-row-group\':\'none\');tb.tBodies[0].style.display=disp;tb.tHead.style.display=disp; document.getElementById(\'dbProfilerButton\').innerHTML=(disp==\'none\'?\'&dArr;\':\'&uArr;\');"> <span id="dbProfilerButton" style="float:right;">&dArr;</span>dbProfiler report</caption>
 		<thead style="display:none;"><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
 		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
