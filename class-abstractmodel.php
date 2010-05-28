@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-05-28 - abstractmodel::__set() bug correction on hasOne assignation
 *            - 2010-05-21 - abstractmodel::_getModelStaticProp() check for property existence before returning it
 *            - 2010-05-18 - abstractmodel::_setDatas() now also apply datas that only have a setter method
 *            - 2010-05-17 - some work made on hasOne relation setting when foreignField is not the primaryKey of related model
@@ -1688,10 +1689,10 @@ abstract class abstractModel{
 			);
 		}
 		if(! isset($filterTypes[$filterType]) )
-			throw new Exception(__class__.'::'.__function__.'() invalid parameter filterType('.$filterType.')  must be one of '.implode('|',array_keys($filterTypes)).'.');
+			throw new InvalidArgumentException(__class__.'::'.__function__.'() invalid parameter filterType('.$filterType.') must be one of '.implode('|',array_keys($filterTypes)).'.');
 		$field = self::_cleanKey($modelName,'datasDefs',$field);
 		if($field === false)
-			throw new Exception(__class__.'::'.__function__.'() invalid parameter field('.$field.')  must be one of a valid datas fieldName.');
+			throw new InvalidArgumentException(__class__.'::'.__function__.'() invalid parameter field('.$field.') must be a valid datas fieldName.');
 		if(! is_array($args) )
 			$args = array($args);
 		$field = abstractModel::getModelDbAdapter($modelName)->protect_field_names($field);
@@ -1833,7 +1834,6 @@ abstract class abstractModel{
 			if( (! empty($relDef['foreignField'])) && $relDef['foreignField'] !== self::_getModelStaticProp($relDef['modelName'],'primaryKey') ){
 				# foreignKey is not primaryKey so we must get it throught filteredInstances
 				$tmpCollection = self::getModelLivingInstances($relDef['modelName'])->filterBy($relDef['foreignField'],$localFieldVal);
-				//show($tmpCollection,'trace;exit');
 				if($tmpCollection->count()){
 					$tmpModel = $tmpCollection->current();
 				}
@@ -2013,16 +2013,16 @@ abstract class abstractModel{
 						if( self::existsModelPK($relModelName,$v) )
 							$validValue = true;
 					}else if( $foreignPrimaryKey!==$foreignField ){
-						$_v = self::getModelInstance($relModelName,$v);
-						if( $_v instanceof abstractModel){
-							$_v = $_v->datas[$foreignField];
+						if(!  self::getModelLivingInstances($relModelName)->filterBy($foreignField,$v)->isEmpty() ){ #- check living instance
+							$validValue = true;
+						}else if(! abstractModel::getFilteredModelInstancesByField($relModelName,$foreignField,'Equal',$v)->isEmpty() ){ #- check exists in database
 							$validValue = true;
 						}
 					}
 					if( $validValue ){
-						$this->datas[$localField] = self::setModelDatasType($this,$localField,$_v);
+						$this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					}else{
-						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
+						throw new UnexpectedValueException(get_class($this)." error while trying to set an invalid $k value($v).");
 					}
 					break;
 				case 'requiredBy': #- as we don't rely on this relation there's no such big deal to be confident in the user to give correct value,
@@ -2214,7 +2214,7 @@ abstract class abstractModel{
 			if(  $k===$primaryKey)
 				continue;
 			if( isset($datasDefs[$k]) || isset($hasOne[$k]) ){
-				$this->$k = $v;
+				$this->{$k} = $v;
 			}elseif(isset($hasMany[$k])){
 				$this->{'set'.$k.'Collection'}($v);
 			}elseif( $this->_methodExists('set'.$k)){
@@ -2225,7 +2225,7 @@ abstract class abstractModel{
 		if( null !== $forcedPrimaryKey )
 			$this->datas[$primaryKey] = self::setModelDatasType($this,$primaryKey,$forcedPrimaryKey);
 		if(false !== $leaveNeedSaveState )
-			 $this->needSave = $leaveNeedSaveState;
+			$this->needSave = $leaveNeedSaveState;
 		return $this;
 	}
 
