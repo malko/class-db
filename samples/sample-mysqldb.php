@@ -38,7 +38,7 @@ else
   echo "Error while inserting\n";
 
 # we can get some info on the database and tables
-echo "list tables in $dbname:\n";
+echo "list tables in the database:\n";
 print_r($db->list_tables());
 
 echo "list fields from test table:\n";
