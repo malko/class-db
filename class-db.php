@@ -108,17 +108,17 @@ class dbProfiler{
 		$trace = basename($trace[1]['file']).' ('.$trace[1]['line'].')';
 		if(! empty($traceContext) ){
 			#- $trace = "<abbr title=\"$traceContext\">$trace</abbr>";
-			$trace = '<div style="position:relative;" onmouseover="this.children[0].style.display=\'block\';" onmouseout="this.children[0].style.display=\'none\';">'
-				.$trace.'<div style="display:none;position:absolute;background:#ffe;z-index:1;border:solid #555 1px;right:0;bottom:0;white-space:nowrap;padding:.2em;color:#000;">'
-				.$traceContext.'</div></div>';
+			$traceExtended = $trace.'<br />'.$traceContext;
 		}
 		$stat = array(
 			$trace,
 			"<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',
-			$this->get_microtime()
+			$this->get_microtime(),
+			0,
+			$traceExtended
 		);
 		$res  = call_user_func_array(array($this->db,$m),$a);
-		$stat[] = $this->get_microtime();
+		$stat[3] = $this->get_microtime();
 		if( $res === false){
 			$stat[0] = '<span style="color:red;">'.$stat[0].'</span>';
 		}
@@ -138,14 +138,51 @@ class dbProfiler{
 		if(! count(self::$stats) )
 			return;
 		$total = 0;
-		foreach(self::$stats as $stat){
-			list($locInfo,$query,$start,$end) = $stat;
+		foreach(self::$stats as $k=>$stat){
+			list($locInfo,$query,$start,$end,$trace) = $stat;
 			$time = round($end-$start,self::$precision);
-			$rows[] = '<tr><td style="border-bottom:solid silver 1px;vertical-align:top;">'.$query.'</td><td style="border-bottom:solid silver 1px;vertical-align:top;"><i>'.$locInfo.'</i></td><td style="border-bottom:solid silver 1px;text-align:right;vertical-align:top;">'.$time.' sec</td></tr>';
+			$rows[] = '<tr onclick="displayDbProfilerReport.call(this)" style="cursor:pointer;"><td style="border-bottom:solid silver 1px;vertical-align:top;">'.$query.'</td><td style="border-bottom:solid silver 1px;vertical-align:top;"><i>'.$locInfo.'</i></td><td style="border-bottom:solid silver 1px;text-align:right;vertical-align:top;">'.$time.' sec</td></tr>';
+			$rows[] = '<tr><td style="display:none;border-bottom:solid silver 1px;vertical-align:top;background:#ffe;color:#664;white-space:nowrap;" colspan="3">'.$trace.'</td></tr>';
 			$total += $time;
 		}
-		echo '<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;text-align:left;position:relative;">
-		<caption style="text-align:left;font-weight:bold;cursor:pointer;" title="show / hide report details" onclick="var tb=this.parentNode;var disp=(tb.tBodies[0].style.display==\'none\'?\'table-row-group\':\'none\');tb.tBodies[0].style.display=disp;tb.tHead.style.display=disp; document.getElementById(\'dbProfilerButton\').innerHTML=(disp==\'none\'?\'&dArr;\':\'&uArr;\');"> <span id="dbProfilerButton" style="float:right;">&dArr;</span>dbProfiler report</caption>
+		echo '
+		<script type="text/javascript">
+			if( typeof displayDbProfilerReport == "undefined"){
+				var extendedDbProfilerDisplay = function(){
+					var tb=this.parentNode
+						, disp=tb.tBodies[0].style.display==="none"?"table-row-group":"none";
+
+						try{
+							tb.tBodies[0].style.display=disp;
+							tb.tHead.style.display=disp;
+						}catch(e){
+							tb.tBodies[0].style.display="block";
+							tb.tHead.style.display="block";
+						}
+						document.getElementById(\'dbProfilerButton\').innerHTML=(disp==\'none\'?\'&darr;\':\'&uarr;\');
+				}
+				var displayDbProfilerReport = function(rowId){
+					var cell = this.nextSibling.cells[0]
+						, bb = ""
+						;
+					if( cell.style.display !== "none" ){
+						cell.style.display = "none";
+						bb= "solid silver 1px";
+					}else{
+						try{
+							cell.style.display = "table-cell";
+						}catch(e){
+							cell.style.display = "block";
+						}
+					}
+					for( var i=0,l=this.cells.length;i<l;i++){
+						this.cells[i].style.borderBottom=bb;
+					}
+				}
+			}
+		</script>
+		<table cellspacing="0" cellpadding="2" style="border:solid silver 1px;text-align:left;position:relative;">
+		<caption style="text-align:left;font-weight:bold;cursor:pointer;" title="show / hide report details" onclick="extendedDbProfilerDisplay.call(this);"> <span id="dbProfilerButton" style="float:right;">&dArr;</span>dbProfiler report</caption>
 		<thead style="display:none;"><tr><th style="text-align:left;border-bottom:solid silver 1px;">Query</th><th style="border-bottom:solid silver 1px;">at</th><th style="text-align:right;border-bottom:solid silver 1px;">time</th></tr></thead>
 		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
 		<tbody id="dbProfilerReport" style="display:none;">'.implode('',$rows)."</tbody>
