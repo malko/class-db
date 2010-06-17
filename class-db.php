@@ -679,7 +679,7 @@ class db{
 	* @param string $table
 	* @param array $values list of arr(FLD=>VALUE,)
 	* @param string|array $fields list of field names,
-	* 										        if null will use first values keys as field names if not numeric
+	*                             if null will use first values keys as field names if not numeric
 	*                             else will simply ignore the fields part of the query
 	* @return int affected_rows
 	*/

@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
+*            - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
+*            - 2010-06-09 - abstractmodel::__set() now always return passed value when call a user defined setter for more consistency
 *            - 2010-05-28 - abstractmodel::__set() bug correction on hasOne assignation
 *            - 2010-05-21 - abstractmodel::_getModelStaticProp() check for property existence before returning it
 *            - 2010-05-18 - abstractmodel::_setDatas() now also apply datas that only have a setter method
@@ -925,7 +928,11 @@ class modelCollection extends arrayObject{
 		#- ensure datas are loaded to avoid multiple on demand loading
 		if( 'shuffle'!== $sortType )
 			$this->loadDatas();
-		uasort($this,array($this,'sortCompare'));
+		if( method_exists($this,'uasort')){
+			$this->uasort(array($this,'sortCompare'));
+		}else{
+			uasort($this,array($this,'sortCompare'));
+		}
 		return $this;
 	}
 	/**
@@ -945,8 +952,9 @@ class modelCollection extends arrayObject{
 	* internal method to sort collection
 	* @private
 	* @see modelCollection::sort(), modelCollection::rsort()
+	* @note MUST BE PUBLIC TO GET THIS WORK WITH PHP5.3.2
 	*/
-	private function sortCompare($_a,$_b){
+	public function sortCompare($_a,$_b){
 		if( 'shuffle' === $this->_sortType ) #- shuffle don't need to know real values
 			return rand(-1,1);
 		$a = $_a->{$this->_sortBy};
@@ -1978,13 +1986,15 @@ abstract class abstractModel{
 		#- apply filters
 		if(! $this->bypassFilters){
 			$v = $this->filterData($k,$v);
-			if($v === false)
+			if($v === false){
 				return false;
+			}
+			#- call user defined setter first
+			if( $this->_methodExists("set$k") ){
+				$this->{"set$k"}($v);
+				return $v;
+			}
 		}
-
-		#- call user defined setter first
-		if( (! $this->bypassFilters) && $this->_methodExists("set$k") )
-			return $this->{"set$k"}($v);
 
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		if(isset($hasOne[$k])){
@@ -2525,12 +2535,23 @@ abstract class abstractModel{
 	* protected function onBeforeSave(){}
 	*/
 	/**
+	* optionnal method onAfterSave to let user define any action to take after the save completion
+	* @param bool $wasTemporary
+	* @private
+	* protected function onAfterSave($wasTemporary){}
+	*/
+	/**
 	* Optionnal method onBeforeDelete to let user define any action to take before the delete to start
 	* If return true then abort the delete process without any warning in the delete method.
 	* So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own.
 	* If the method return true it MUST set $this->deleted to true and call $this->detach() method if required.
 	* @private
 	* protected function onBeforeDelete(){}
+	*/
+	/**
+	* Optionnal method onAfterDelete to let user define any action to take after the delete completion
+	* @private
+	* protected function onAfterDelete(){}
 	*/
 
 
@@ -2609,14 +2630,14 @@ abstract class abstractModel{
 					break;
 			}
 		}
-
+		$wasTemporary = $this->isTemporary();
 		if( $needSave > 0){
 			$datas = $this->datas;
 			$PK = $this->PK;
 			$primaryKey = self::_getModelStaticProp($this,'primaryKey');
 			$tableName = self::_getModelStaticProp($this,'tableName');
 			unset($datas[$primaryKey]); # update all but primaryKey
-			if(! $this->isTemporary() ){ # update
+			if(! $wasTemporary ){ # update
 				if( false === $this->dbAdapter->update($tableName,$datas,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$PK)) )
 					throw new Exception(get_class($this)." Error while updating (PK=$PK).");
 			}else{ # insert
@@ -2657,6 +2678,9 @@ abstract class abstractModel{
 		}
 
 		$this->needSave = 0;
+		if( $this->_methodExists('onAfterSave') ){
+			$res = $this->onAfterSave($wasTemporary);
+		}
 		return $this;
 	}
 
@@ -2731,6 +2755,9 @@ abstract class abstractModel{
 		$res = $this->dbAdapter->delete($tableName,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$this->PK));
 		if($res===false)
 			throw new Exception(get_class($this)."::delete() Error while deleting.");
+		if( $this->_methodExists('onAfterDelete') ){
+			$this->onAfterDelete();
+		}
 		$this->deleted = true;
 		$this->detach();
 	}
