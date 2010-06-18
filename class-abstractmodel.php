@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 *            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
+*                         - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
 *            - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
 *            - 2010-06-09 - abstractmodel::__set() now always return passed value when call a user defined setter for more consistency
 *            - 2010-05-28 - abstractmodel::__set() bug correction on hasOne assignation
@@ -2567,7 +2568,7 @@ abstract class abstractModel{
 		# exit if already in saving state
 		if( $needSave < 0 )
 			return $this;
-		if( $this->_methodExists('onBeforeSave') ){
+		if( $needSave > 0 && $this->_methodExists('onBeforeSave') ){
 			$PK = $this->PK;
 			$res = $this->onBeforeSave();
 			if( $PK !== $this->PK)
@@ -2679,7 +2680,7 @@ abstract class abstractModel{
 		}
 
 		$this->needSave = 0;
-		if( $this->_methodExists('onAfterSave') ){
+		if( $needSave > 0 && $this->_methodExists('onAfterSave') ){
 			$res = $this->onAfterSave($wasTemporary);
 		}
 		return $this;
@@ -2694,9 +2695,10 @@ abstract class abstractModel{
 	public function delete(){
 		if($this->deleted)
 			throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
-		if($this->needSave < 0)
+		$needSave = $this->needSave();
+		if($needSave < 0)
 			return $this;
-		if( $this->_methodExists('onBeforeDelete') ){
+		if( $needSave > 0 && $this->_methodExists('onBeforeDelete') ){
 			$res = $this->onBeforeDelete();
 			if( true === $res )
 				return;
@@ -2756,7 +2758,7 @@ abstract class abstractModel{
 		$res = $this->dbAdapter->delete($tableName,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$this->PK));
 		if($res===false)
 			throw new Exception(get_class($this)."::delete() Error while deleting.");
-		if( $this->_methodExists('onAfterDelete') ){
+		if( $needSave > 0 && $this->_methodExists('onAfterDelete') ){
 			$this->onAfterDelete();
 		}
 		$this->deleted = true;
