@@ -2524,7 +2524,8 @@ abstract class abstractModel{
 	* (generally used when autoIncrement is not set on the primaryKey)
 	* @return primaryKey
 	* @private
-	* protected function _newPrimaryKey(){}
+	* @return mixed
+	* @fn protected function _newPrimaryKey(){}
 	*/
 
 	/**
@@ -2532,13 +2533,13 @@ abstract class abstractModel{
 	* if return true then abort the save process without any warning in the save method.
 	* So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own
 	* @private
-	* protected function onBeforeSave(){}
+	* @fn protected function onBeforeSave(){}
 	*/
 	/**
 	* optionnal method onAfterSave to let user define any action to take after the save completion
 	* @param bool $wasTemporary
 	* @private
-	* protected function onAfterSave($wasTemporary){}
+	* @fn protected function onAfterSave($wasTemporary){}
 	*/
 	/**
 	* Optionnal method onBeforeDelete to let user define any action to take before the delete to start
@@ -2546,12 +2547,12 @@ abstract class abstractModel{
 	* So the user can choose to throw an exception or to append messages to any stack messages or any choice of his own.
 	* If the method return true it MUST set $this->deleted to true and call $this->detach() method if required.
 	* @private
-	* protected function onBeforeDelete(){}
+	* @fn protected function onBeforeDelete(){}
 	*/
 	/**
 	* Optionnal method onAfterDelete to let user define any action to take after the delete completion
 	* @private
-	* protected function onAfterDelete(){}
+	* @fn protected function onAfterDelete(){}
 	*/
 
 
