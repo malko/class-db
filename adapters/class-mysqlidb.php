@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL: http://trac.jgotti.net/svn/class-db/trunk/class-mysqldb.php $
 * @changelog
+*            - 2010-07-07 - introduce freeRestults method
 *            - 2010-02-22 - now error on select_db at open/check_connection('active') time will return false
 *            - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
 *                           $setNamesOnSelectDb if both are null then nothing will happen else it will perform
@@ -219,7 +220,14 @@ class mysqlidb extends db{
 			return $num;
 		}
 	}
-
+	public function freeResults(){
+		if( is_resource($this->last_qres)){
+			mysqli_free_result($this->last_qres);
+		}
+		$this->last_qres = null;
+		parent::freeResults();
+		return $this;
+	}
 	/**
 	* get the table list from $this->dbname
 	* @return array

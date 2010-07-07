@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-07-07 - introduce freeResults method
 *            - 2010-05-20 - litle enhancement of trace display in dbProfiler::printReport()
 *            - 2010-03-24 - add optional parameter $fullSliceAttrs to select_slice() method
 *            - 2010-02-01 - new db::show_table_primaryKey() method
@@ -473,6 +474,15 @@ class db{
 			return FALSE;
 		}
 		return $this->last_q2a_res = $this->fetch_res($this->last_qres,$result_type);
+	}
+	/**
+	* free some memory by dropping cached results of last datas
+  * return $this for method chaining
+  */
+	public function freeResults(){
+		$this->last_qres = null;
+		$this->last_q2a_res = array();
+		return $this;
 	}
 
 	/**

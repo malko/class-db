@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-07-07 - some memory improvements
 *            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
 *                         - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
 *            - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
@@ -510,6 +511,7 @@ class modelCollection extends arrayObject{
 				$lField = $relDef['linkLocalField'];
 				$fField = $relDef['linkForeignField'];
 				$links = $db->select_rows($relDef['linkTable'],'*',array('WHERE '.$db->protect_field_names($lField).' IN (?)',$this->PK));
+				$db->freeResults();
 			}else{
 				$lKey   = empty($relDef['localField'])?abstractModel::_getModelStaticProp($this->collectionType,'primaryKey') :$relDef['localField'] ;
 				$lField = $relDef['foreignField'];
@@ -517,6 +519,7 @@ class modelCollection extends arrayObject{
 				$fTable = abstractModel::_getModelStaticProp($relDef['modelName'],'tableName');
 				$fField = abstractModel::_getModelStaticProp($relDef['modelName'],'primaryKey');
 				$links  = $db->select_rows("$fTable","$fField,$lField",array('WHERE '.$db->protect_field_names($lField).' IN (?)',$this->{$lKey}));
+				$db->freeResults();
 			}
 			if(! $links)
 				return $c;
@@ -700,12 +703,14 @@ class modelCollection extends arrayObject{
 			if($limit>0)
 				$needLoad = array_slice($needLoad,0,$limit);
 			$rows = $db->select_rows($tb,'*',array('WHERE '.$db->protect_field_names($primaryKey).' IN (?)',$needLoad));
+			$db->freeResults();
 			if( empty($rows) ) #- @todo musn't append so certainly have to throw an exception ??
 				return $this;
 			foreach($rows as $row){
 				$PK = $row[$primaryKey];
 				$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true,true);
 			}
+			$rows=null;
 		}
 
 		if(null!==$withRelated){
@@ -1610,7 +1615,7 @@ abstract class abstractModel{
 				$PK = self::setModelDatasType($modelName,$primaryKey,$PK);
 			unset($datas[$primaryKey]);
 		}
-		$instance   = null;
+		$instance = null;
 
 		#- check for living instance
 		if(null!==$PK){
@@ -1653,6 +1658,7 @@ abstract class abstractModel{
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$db = self::getModelDbAdapter($modelName);
 		$PKs = $db->select_col($tableName,$primaryKey,$filter);
+		$db->freeResults();
 		return self::getMultipleModelInstances($modelName,empty($PKs)?array():$PKs);
 	}
 	/**
@@ -1729,12 +1735,14 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$db = self::getModelDbAdapter($modelName);
 		$rows = $db->select_rows($tableName,'*',$orderedBY);
+		$db->freeResults();
 		$collection = modelCollection::init($modelName);
 		if( $rows === false ){
 			return $collection;
 		}
 		foreach($rows as $row)
 			$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
+		$rows = null;
 		if( null !== $withRelated )
 			$collection->loadDatas($withRelated);
 		return $collection;
@@ -1754,6 +1762,7 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$db = self::getModelDbAdapter($modelName);
 		$rows = $db->select_slice($tableName,'*',$filter,$pageId,$pageSize,self::_setModelPagedNav($modelName));
+		$db->freeResults();
 		$collection = modelCollection::init($modelName);
 		if( $rows === false )
 			return array($collection,'',0);
@@ -1761,6 +1770,7 @@ abstract class abstractModel{
 		if(! empty($rows)){
 			foreach($rows as $row)
 				$collection[] = self::getModelInstanceFromDatas($modelName,$row,true,true,true);
+			$rows  = null;
 			if( null !== $withRelated )
 				$collection->loadDatas($withRelated);
 		}
@@ -1906,6 +1916,7 @@ abstract class abstractModel{
 						)
 					);
 				}
+				$this->dbAdapter->freeResults();
 				return $this->_manyModels[$relName] = abstractModel::getMultipleModelInstances($relDef['modelName'],empty($PKs)?array():$PKs);
 			}
 		}
@@ -2003,6 +2014,23 @@ abstract class abstractModel{
 			$relModelName   = $hasOne[$k]['modelName'];
 			$thisPrimaryKey = self::_getModelStaticProp($this,'primaryKey');
 			$localField     = empty($hasOne[$k]['localField'])? $thisPrimaryKey : $hasOne[$k]['localField'];
+			if( $this->bypassFilters ){ //-- bypass filter so make a quicker version
+				if( is_object($v) ){
+					if(! $v instanceof $relModelName)
+						throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
+					$this->_oneModels[$k] = $v;
+					if(isset($this->datasDefs[$localField]) && $localField !== $thisPrimaryKey){
+						$this->datas[$localField] = $v->datas[empty($hasOne[$k]['foreignField'])?$v->primaryKey:$hasOne[$k]['foreignField']];
+					}
+					return $v;
+				}else{
+					$this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
+					if( isset($this->_oneModels[$k])){
+						unset($this->_oneModels[$k]); //-- sort of way to empty the cached related object, next call to get the related will dynamicly reload the related if required
+					}
+					return $v;
+				}
+			}
 			$foreignPrimaryKey = self::_getModelStaticProp($relModelName,'primaryKey');
 			$foreignField   = empty($hasOne[$k]['foreignField'])? $foreignPrimaryKey : $hasOne[$k]['foreignField'];
 			if( is_object($v) ){
