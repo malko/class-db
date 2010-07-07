@@ -229,6 +229,7 @@ class db{
 		'insertExtended'           => 'insert_extended',
 		'getTablePK'               => 'show_table_primaryKey',
 		'getTablePrimaryKey'       => 'show_table_primaryKey',
+		'count'                    => 'get_count',
 		/** convenience aliases */
 		'extended_insert'          => 'insert_extended',
 		'show_table_PK'            => 'show_table_primaryKey',
