@@ -11,7 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2010-07-07 - some memory improvements
+*            - 2010-07-07 - some memory and speed improvements
 *            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
 *                         - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
 *            - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
@@ -2007,7 +2007,6 @@ abstract class abstractModel{
 				return $v;
 			}
 		}
-
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
 		if(isset($hasOne[$k])){
 			$this->needSave = 1; #- for now we change the needSave state will see later to check for unchanged values
@@ -2252,7 +2251,12 @@ abstract class abstractModel{
 		foreach($datas as $k=>$v){
 			if(  $k===$primaryKey)
 				continue;
-			if( isset($datasDefs[$k]) || isset($hasOne[$k]) ){
+			if( isset($datasDefs[$k]) ){
+				if( $this->bypassFilters)
+					$this->datas[$k] = self::setModelDatasType($this,$k,$v);//$v;
+				else
+					$this->{$k} = $v;
+			}elseif( isset($hasOne[$k]) ){
 				$this->{$k} = $v;
 			}elseif(isset($hasMany[$k])){
 				$this->{'set'.$k.'Collection'}($v);
