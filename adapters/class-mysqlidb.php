@@ -147,7 +147,7 @@ class mysqlidb extends db{
 		$result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
-		eval('$result_type = MYSQLI_'.strtoupper($result_type).';');
+		$result_type = constant('MYSQLI_'.strtoupper($result_type));
 		while($res[]=mysqli_fetch_array($result_set,$result_type));
 		unset($res[count($res)-1]);//unset last empty row
 		$this->num_rows = mysqli_affected_rows($this->conn);

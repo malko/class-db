@@ -104,7 +104,7 @@ class sqlitedb extends db{
 		$result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
-		eval('$result_type = SQLITE_'.$result_type.';');
+		$result_type = constant('SQLITE_'.$result_type);
 
 		while($res[]=sqlite_fetch_array($result_set,$result_type));
 		unset($res[count($res)-1]);//unset last empty row

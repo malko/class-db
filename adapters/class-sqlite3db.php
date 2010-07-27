@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-07-27 - first attempt for native php5 sqlite3 rewrite
 *            - 2008-07-29 - suppress a bug to avoid some error while trying to destroy twice the same last_qres.
 * @todo add transactions support
 */
@@ -26,13 +27,15 @@ class sqlite3db extends db{
 
 	public $db_file = '';
 	public $_protect_fldname = "'";
+	public $encryptionKey=null;
 	/**
 	* create a sqlitedb object for managing locale data
 	* if DATA_PATH is define will force access in this directory
-	* @param string $Db_file
+	* @param string $db_file
+	* @param string $encryptionKey
 	* @return sqlitedb object
 	*/
-	function __construct($db_file){
+	function __construct($db_file,$encryptionKey=null){
 		$this->host = 'localhost';
 		$this->db_file = $db_file;
 		$this->conn = &$this->db; # only for better compatibility with other db implementation
@@ -47,14 +50,18 @@ class sqlite3db extends db{
 		if($this->db)
 			return $this->db;
 		if(! $this->db_file )
-			return FALSE;
+			return false;
 		if(! (is_file($this->db_file) || $this->autocreate) )
-			return FALSE;
-		if( $this->db = sqlite3_open($this->db_file)){
+			return false;
+		if( $this->autocreate)
+			$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,$this->encryptionKey);
+		else
+			$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE,$this->encryptionKey);
+		if( $this->db instanceof SQLite3){
 			return $this->db;
 		}else{
 			$this->set_error(__FUNCTION__);
-			return FALSE;
+			return false;
 		}
 	}
 	/** close connection to previously opened database */
@@ -75,7 +82,7 @@ class sqlite3db extends db{
 	* @return bool
 	*/
 	function check_conn($action = ''){
-		if(! $this->db){
+		if( is_null($this->db)){
 			if($action !== 'active')
 				return $action==='kill'?true:false;
 			return $this->open()===false?false:true;
@@ -97,25 +104,17 @@ class sqlite3db extends db{
 		$result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
-		if($result_type==='ASSOC'){
-			while($res[]=sqlite3_fetch_array($result_set));
-			unset($res[count($res)-1]);//unset last empty row
-		}elseif($result_type==='NUM'){
-			while($res[]=sqlite3_fetch($result_set));
-			unset($res[count($res)-1]);//unset last empty row
-		}else{
-			while($row=sqlite3_fetch_array($result_set)){
-				$res[] = array_merge($row,array_values($row));
-			};
-		}
-		if( empty($res) )
-			return $this->last_q2a_res = false;
+		$result_type = constant('SQLITE3_'.$result_type);
+
+		while($res[]=$result_set->fetch_array($result_type));
+		array_pop($res);//unset last empty row
+
 		$this->num_rows = count($res);
-		return $this->last_q2a_res = $res;
+		return $this->last_q2a_res = count($res)?$res:false;
 	}
 
 	function last_insert_id(){
-		return $this->db?sqlite3_last_insert_rowid($this->db):FALSE;
+		return $this->db?$this->db->lastInsertRowID():false;
 	}
 
 	/**
@@ -124,21 +123,21 @@ class sqlite3db extends db{
 	* @return result id or bool depend on the query type| FALSE
 	*/
 	function query($Q_str){
-		if(! $this->db ){
+		if(is_null($this->db) ){
 			if(! (db::$autoconnect && $this->open()) )
-				return FALSE;
+				return false;
 		}
 		$this->verbose($Q_str,__FUNCTION__,2);
-		if($this->last_qres){#- close unclosed previous qres
-			sqlite3_query_close($this->last_qres);
+		if($this->last_qres instanceof SQLite3Result){#- close unclosed previous qres
+			$this->last_qres->finalize();
 			$this->last_qres = null;
 		}
 
 		if( preg_match('!^\s*select!i',$Q_str) ){
-			$this->last_qres = sqlite3_query($this->db,$Q_str);
+			$this->last_qres = $this->db->query($Q_str);
 			$res = $this->last_qres;
 		}else{
-			$res = sqlite3_exec($this->db,$Q_str);
+			$res = $this->db->exec($Q_str);
 		}
 		if(! $res)
 			$this->set_error(__FUNCTION__);
@@ -156,8 +155,21 @@ class sqlite3db extends db{
 	*/
 	function query_affected_rows($Q_str){
 		if(! $this->query($Q_str) )
-			return FALSE;
-		return sqlite3_changes($this->db);
+			return false;
+		return $this->db->changes();
+	}
+
+	/**
+	* free some memory by dropping cached results of last datas
+  * return $this for method chaining
+  */
+	public function freeResults(){
+		if( $this->last_qres instanceof SQLite3Result ){
+			$this->last_qres->finalize();
+		}
+		$this->last_qres = null;
+		$this->last_q2a_res = array();
+		return $this;
 	}
 
 	/**
@@ -216,8 +228,44 @@ class sqlite3db extends db{
 		return $ret;
 	}
 
-	/** Verifier si cette methode peut s'appliquer a SQLite * /
-	function show_table_keys($table){}
+	/** return informations about table indexes */
+	function show_table_keys($table){
+		$ids = $this->query_to_array('PRAGMA INDEX_LIST('.$table.')');
+		$res = array();
+		$fields = $this->list_table_fields($table,true);
+		foreach($fields as $k=>$v){
+			if( !empty($v['Key']) ){
+				$kname = $v['Key']==="PRIMARY"?$v['Key']:$k;
+				$unique = $v['Key']==="PRIMARY"?1:($v['Key']==="UNIQUE"?1:0);
+				$res[] = array(
+					'Table'=>$table,
+					'Key_name'  => $kname,
+					'name'      => $kname,
+					'unique'    => $unique,
+					'Non_unique'=> $unique?0:1,
+					'Column_name'=>$k,
+					'Null' => $v['Null'] === 'YES'?true:false
+				);
+			}
+		}
+		if( $ids ){
+			foreach($ids as $id){
+				$key = array(
+					'Table'=>$table,
+					'Key_name'=>$id['name'],
+					'name'=>$id['name'],
+					'unique'=> $id['unique'],
+					'Non_unique'=> $id['unique']?0:1,
+				);
+				$tmp = $this->query_to_array('PRAGMA INDEX_INFO('.$id['name'].')');
+				foreach($tmp as $idCol){
+					$res[] = array_merge($key,array('Column_name'=>$idCol['name'],'Null'=>$fields[$idCol['name']]['Null']==='YES'?true:false));
+				}
+			}
+		}
+		return $res;
+
+	}
 
 	/**
 	* optimize table statement query
@@ -243,57 +291,34 @@ class sqlite3db extends db{
 	* @return str
 	*/
 	function escape_string($string,$quotestyle='both'){
-
-		if( function_exists('sqlite_escape_string') ){
-			$string = sqlite_escape_string($string);
-			$string = str_replace("''","'",$string); #- no quote escaped so will work like with no sqlite_escape_string available
-		}else{
-			$escapes = array("\x00", "\x0a", "\x0d", "\x1a", "\x09","\\");
-			$replace = array('\0',   '\n',    '\r',   '\Z' , '\t',  "\\\\");
-		}
+		$string = $this->db->escapeString($string);
 		switch(strtolower($quotestyle)){
 			case 'double':
 			case 'd':
 			case '"':
-				$escapes[] = '"';
-				$replace[] = '\"';
+				$string = str_replace("''","'",$string);
+				$string = str_replace('"','\"',$string);
 				break;
 			case 'single':
 			case 's':
 			case "'":
-				$escapes[] = "'";
-				$replace[] = "''";
 				break;
 			case 'both':
 			case 'b':
 			case '"\'':
 			case '\'"':
-				$escapes[] = '"';
-				$replace[] = '\"';
-				$escapes[] = "'";
-				$replace[] = "''";
+				$string = str_replace('"','\"',$string);
 				break;
 		}
-		return str_replace($escapes,$replace,$string);
+		return $string;
 	}
 
 	function error_no(){
-		$this->verbose('sqlite3 driver doesn\'t support this method',__function__,1);
+		return $this->db?$this->db->lastErrorCode():false;
 	}
 
 	function error_str($errno=null){
-		return sqlite3_error($this->db);
+		return $this->db?$this->db->lastErrorMsg():false;
 	}
 
-	protected function set_error($callingfunc=null){
-		static $i=0;
-		if(! $this->db ){
-			$this->error[$i] = '[ERROR] No Db Handler';
-		}else{
-			$this->error[$i] =  $this->error_str();
-		}
-		$this->last_error = $this->error[$i];
-		$this->verbose($this->error[$i],$callingfunc,1);
-		$i++;
-	}
 }

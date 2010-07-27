@@ -147,7 +147,7 @@ class mysqldb extends db{
 		$result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
-		eval('$result_type = MYSQL_'.strtoupper($result_type).';');
+		$result_type = constant('MYSQL_'.strtoupper($result_type));
 
 		while($res[]=mysql_fetch_array($result_set,$result_type));
 		unset($res[count($res)-1]);//unset last empty row
