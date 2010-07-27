@@ -68,10 +68,10 @@ class sqlite3db extends db{
 	function close(){
 		if( !is_null($this->db) ){
 			if($this->last_qres){
-				sqlite3_query_close($this->last_qres);
+				$this->last_qres->finalize();
 				$this->last_qres = null;
 			}
-			sqlite3_close($this->db);
+			$this->db->close();
 		}
 		$this->db = null;
 	}
@@ -106,7 +106,7 @@ class sqlite3db extends db{
 			$result_type = 'ASSOC';
 		$result_type = constant('SQLITE3_'.$result_type);
 
-		while($res[]=$result_set->fetch_array($result_type));
+		while($res[]=$result_set->fetchArray($result_type));
 		array_pop($res);//unset last empty row
 
 		$this->num_rows = count($res);
