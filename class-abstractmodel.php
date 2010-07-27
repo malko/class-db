@@ -2727,7 +2727,7 @@ abstract class abstractModel{
 	public function delete(){
 		if($this->deleted)
 			throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
-		$needSave = $this->needSave();
+		$needSave = $this->needSave;
 		if($needSave < 0)
 			return $this;
 		if( $needSave > 0 && $this->_methodExists('onBeforeDelete') ){
