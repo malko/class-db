@@ -18,24 +18,40 @@
 */
 
 /**
+* try to determine the native driver presence else will default back using pdo
+*/
+if( class_exists('SQLite3',false) ){
+	define('SQLITE3DB_NATIVE_DRIVER',true);
+}else if ( class_exists('PDO',false) && in_array('sqlite',PDO::getAvailableDrivers()) ){
+	define('SQLITE3DB_NATIVE_DRIVER',false);
+}else{
+	define('SQLITE3DB_NATIVE_DRIVER',null);
+}
+
+
+
+/**
 * exented db class to use with sqlite3 databases.
 * require php sqlite3 extension to work
 * @class sqlite3db
 */
 class sqlite3db extends db{
-	public $autocreate= TRUE;
+	public $autocreate= true;
 
 	public $db_file = '';
-	public $_protect_fldname = "'";
+	public $_protect_fldname = "`";
 	public $encryptionKey=null;
 	/**
 	* create a sqlitedb object for managing locale data
 	* if DATA_PATH is define will force access in this directory
 	* @param string $db_file
-	* @param string $encryptionKey
+	* @param string $encryptionKey (only available with native driver and if the encryption was enable at compilation time.)
 	* @return sqlitedb object
 	*/
 	function __construct($db_file,$encryptionKey=null){
+		if( null === SQLITE3DB_NATIVE_DRIVER ){
+			throw new Exception("sqlite3db: No sqlite3 driver available");
+		}
 		$this->host = 'localhost';
 		$this->db_file = $db_file;
 		$this->conn = &$this->db; # only for better compatibility with other db implementation
@@ -53,11 +69,20 @@ class sqlite3db extends db{
 			return false;
 		if(! (is_file($this->db_file) || $this->autocreate) )
 			return false;
-		if( $this->autocreate)
-			$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,$this->encryptionKey);
-		else
-			$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE,$this->encryptionKey);
-		if( $this->db instanceof SQLite3){
+		if( SQLITE3DB_NATIVE_DRIVER ){
+			if( $this->autocreate){
+				$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE,$this->encryptionKey);
+			}else{
+				$this->db = new SQLite3($this->db_file,SQLITE3_OPEN_READWRITE,$this->encryptionKey);
+			}
+		}else{ //- no support for encryptionKey, autocreate is default to true.
+			$this->db = new PDO("sqlite:$this->db_file");
+			$this->db->setAttribute(PDO::ATTR_CASE, PDO::CASE_NATURAL);
+			$this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
+			$this->db->setAttribute(PDO::ATTR_ORACLE_NULLS, PDO::NULL_NATURAL);
+			$this->db->setAttribute(PDO::ATTR_STRINGIFY_FETCHES, true);
+		}
+		if( (SQLITE3DB_NATIVE_DRIVER && $this->db instanceof SQLite3) ||  (! SQLITE3DB_NATIVE_DRIVER && $this->db instanceof PDO)){
 			return $this->db;
 		}else{
 			$this->set_error(__FUNCTION__);
@@ -67,11 +92,9 @@ class sqlite3db extends db{
 	/** close connection to previously opened database */
 	function close(){
 		if( !is_null($this->db) ){
-			if($this->last_qres){
-				$this->last_qres->finalize();
-				$this->last_qres = null;
-			}
-			$this->db->close();
+			$this->freeResults();
+			if( SQLITE3DB_NATIVE_DRIVER)
+				$this->db->close();
 		}
 		$this->db = null;
 	}
@@ -104,17 +127,19 @@ class sqlite3db extends db{
 		$result_type = strtoupper($result_type);
 		if(! in_array($result_type,array('NUM','ASSOC','BOTH')) )
 			$result_type = 'ASSOC';
-		$result_type = constant('SQLITE3_'.$result_type);
-
-		while($res[]=$result_set->fetchArray($result_type));
-		array_pop($res);//unset last empty row
-
+		$result_type = constant((SQLITE3DB_NATIVE_DRIVER?'SQLITE3_':'PDO::FETCH_').$result_type);
+		if( SQLITE3DB_NATIVE_DRIVER ){
+			while($res[]=$result_set->fetchArray($result_type));
+			array_pop($res);//unset last empty row
+		}else{
+			$res = $result_set->fetchAll($result_type);
+		}
 		$this->num_rows = count($res);
 		return $this->last_q2a_res = count($res)?$res:false;
 	}
 
 	function last_insert_id(){
-		return $this->db?$this->db->lastInsertRowID():false;
+		return $this->db?(SQLITE3DB_NATIVE_DRIVER?$this->db->lastInsertRowID():$this->db->lastInsertId()):false;
 	}
 
 	/**
@@ -128,12 +153,10 @@ class sqlite3db extends db{
 				return false;
 		}
 		$this->verbose($Q_str,__FUNCTION__,2);
-		if($this->last_qres instanceof SQLite3Result){#- close unclosed previous qres
-			$this->last_qres->finalize();
-			$this->last_qres = null;
-		}
+		#- close unclosed previous qres
+		$this->freeResults();
 
-		if( preg_match('!^\s*select!i',$Q_str) ){
+		if( preg_match('!^\s*(select|optimize|vacuum|pragma)!i',$Q_str) ){
 			$this->last_qres = $this->db->query($Q_str);
 			$res = $this->last_qres;
 		}else{
@@ -154,9 +177,13 @@ class sqlite3db extends db{
 	* @return int affected_rows
 	*/
 	function query_affected_rows($Q_str){
-		if(! $this->query($Q_str) )
-			return false;
-		return $this->db->changes();
+		if( SQLITE3DB_NATIVE_DRIVER ){
+			if(! $this->query($Q_str) )
+				return false;
+			return $this->db->changes();
+		}else{
+			return $this->query($Q_str);
+		}
 	}
 
 	/**
@@ -164,8 +191,11 @@ class sqlite3db extends db{
   * return $this for method chaining
   */
 	public function freeResults(){
-		if( $this->last_qres instanceof SQLite3Result ){
-			$this->last_qres->finalize();
+		if($this->last_qres !==null ){#- close unclosed previous qres
+			if( SQLITE3DB_NATIVE_DRIVER && $this->last_qres instanceof SQLite3Result)
+				$this->last_qres->finalize();
+			else if( (! SQLITE3DB_NATIVE_DRIVER ) && $this->last_qres instanceof PDOStatement )
+				$this->last_qres->closeCursor();
 		}
 		$this->last_qres = null;
 		$this->last_q2a_res = array();
@@ -184,35 +214,29 @@ class sqlite3db extends db{
 		if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
 			return array_keys($res[0]);
 		}else{ # There 's no row in this table so we try an alternate method or we want extended infos
-			if(! $fields = $this->query_to_array("SELECT sql FROM sqlite_master WHERE type='table' AND name ='$table'") )
-				return FALSE;
-			# get fields from the create query
-			$flds_str = $fields[0]['sql'];
-			$flds_str = substr($flds_str,strpos($flds_str,'('));
-			$type = "((?:[a-z]+)\s*(?:\(\s*\d+\s*(?:,\s*\d+\s*)?\))?)?\s*";
-			$default = '(?:DEFAULT\s+((["\']).*?(?<!\\\\)\\4|[^\s,]+))?\s*';
-			if( preg_match_all('/(\w+)\s+'.$type.$default.'[^,]*(,|\))/i',$flds_str,$m,PREG_SET_ORDER) ){
-				$key  = "PRIMARY|UNIQUE|CHECK";
-				$Extra = 'AUTOINCREMENT';
-				$default = 'DEFAULT\s+((["\'])(.*?)(?<!\\\\)\\2|\S+)';
-				foreach($m as $v){
-					list($field,$name,$type,$default) = $v;
-					# print_r($field);
-					if(!$extended_info){
-						$res[] = $name;
-						continue;
-					}
-					$res[$name] = array('Field'=>$name,'Type'=>$type,'Null'=>'YES','Key'=>'','Default'=>$default,'Extra'=>'');
-					if( preg_match("!($key)!i",$field,$n))
-						$res[$name]['Key'] = $n[1];
-					if( preg_match("!($Extra)!i",$field,$n))
-						$res[$name]['Extra'] = $n[1];
-					if( preg_match('!(NO)T\s+NULL!i',$field,$n))
-						$res[$name]['Null'] = $n[1];
+			if(! $fields = $this->query_to_array('PRAGMA table_info('.$table.')') )
+				return false;
+			$indexes = (array) $this->query_to_array('PRAGMA index_list('.$table.')');
+			if(!empty($indexes)){
+				$indexes = $this->associative_array_from_q2a_res('name','unique',$indexes);
+				foreach($indexes as $iname=>$uni){
+					$info = $this->query_to_array('PRAGMA index_info('.$iname.')');
+					$indexes[$info[0]['name']] = $indexes[$iname];
+					unset($indexes[$iname]);
 				}
-				return $res;
 			}
-			return FALSE;
+
+			foreach($fields as $k=>$f){
+				$fields[$k]['Field'] = $f["name"];
+				$fields[$k]['Type'] = $f["type"];
+				$fields[$k]['Null'] = $f['notnull']?'NO':'YES';
+				$fields[$k]['Key'] = $f['pk']?'PRI':(isset($indexes[$f['name']])?($indexes[$f['name']]?'UNI':'MUL'):'');
+				$fields[$k]['Default'] = $f['dflt_value'];
+				#- $fields[$k]['Extra'] = $f[]; #-- @todo find a way to detect autoIncrement
+				$fields[$f['name']] = $fields[$k];
+				unset($fields[$k]);
+			}
+			return $fields;
 		}
 	}
 	/**
@@ -230,13 +254,13 @@ class sqlite3db extends db{
 
 	/** return informations about table indexes */
 	function show_table_keys($table){
-		$ids = $this->query_to_array('PRAGMA INDEX_LIST('.$table.')');
+		$ids = $this->query_to_array('PRAGMA index_list('.$table.')');
 		$res = array();
 		$fields = $this->list_table_fields($table,true);
 		foreach($fields as $k=>$v){
 			if( !empty($v['Key']) ){
-				$kname = $v['Key']==="PRIMARY"?$v['Key']:$k;
-				$unique = $v['Key']==="PRIMARY"?1:($v['Key']==="UNIQUE"?1:0);
+				$kname = $v['Key']==="PRI"?$v['Key']:$k;
+				$unique = $v['Key']==="PRI"?1:($v['Key']==="UNIQUE"?1:0);
 				$res[] = array(
 					'Table'=>$table,
 					'Key_name'  => $kname,
@@ -257,7 +281,7 @@ class sqlite3db extends db{
 					'unique'=> $id['unique'],
 					'Non_unique'=> $id['unique']?0:1,
 				);
-				$tmp = $this->query_to_array('PRAGMA INDEX_INFO('.$id['name'].')');
+				$tmp = $this->query_to_array('PRAGMA index_info('.$id['name'].')');
 				foreach($tmp as $idCol){
 					$res[] = array_merge($key,array('Column_name'=>$idCol['name'],'Null'=>$fields[$idCol['name']]['Null']==='YES'?true:false));
 				}
@@ -291,7 +315,7 @@ class sqlite3db extends db{
 	* @return str
 	*/
 	function escape_string($string,$quotestyle='both'){
-		$string = $this->db->escapeString($string);
+		$string = SQLITE3DB_NATIVE_DRIVER?$this->db->escapeString($string):preg_replace("!^'|'$!",'',$this->db->quote($string));
 		switch(strtolower($quotestyle)){
 			case 'double':
 			case 'd':
@@ -314,11 +338,31 @@ class sqlite3db extends db{
 	}
 
 	function error_no(){
-		return $this->db?$this->db->lastErrorCode():false;
+		if( SQLITE3DB_NATIVE_DRIVER ){
+			return $this->db?$this->db->lastErrorCode():false;
+		}else{
+			if( ! $this->db )
+				return false;
+			if( ($tmp = $this->db->errorCode()) !== null)
+				return $tmp;
+			else if( $this->last_qres instanceof PDOStatement )
+				return $this->last_qres->errorCode();
+		}
 	}
 
 	function error_str($errno=null){
-		return $this->db?$this->db->lastErrorMsg():false;
+		if( SQLITE3DB_NATIVE_DRIVER ){
+			return $this->db?$this->db->lastErrorMsg():false;
+		}else{
+			if( ! $this->db )
+				return false;
+			if( ($tmp = $this->db->errorInfo()) !== null){
+				return $tmp[2];
+			}else if( $this->last_qres instanceof PDOStatement ){
+				$tmp =  $this->last_qres->errorInfo();
+				return $tmp[2];
+			}
+		}
 	}
 
 }

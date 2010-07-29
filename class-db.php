@@ -107,10 +107,7 @@ class dbProfiler{
 		}
 		$traceContext = implode('<br />',$traceContext);
 		$trace = basename($trace[1]['file']).' ('.$trace[1]['line'].')';
-		if(! empty($traceContext) ){
-			#- $trace = "<abbr title=\"$traceContext\">$trace</abbr>";
-			$traceExtended = $trace.'<br />'.$traceContext;
-		}
+			$traceExtended = empty($traceContext)?'':($trace.'<br />'.$traceContext);
 		$stat = array(
 			$trace,
 			"<b>$m</b>(".implode('<b>,</b> ',array_map(array($this,'_prepareArgStr'),$a)).')',
