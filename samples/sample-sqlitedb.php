@@ -10,7 +10,7 @@ define('DB_CONNECTIONSTRING','sqlite3db:///tmp/test.db');
 
 # get a single instance of the class from anywhere in your script
 $db = db::getInstance(DB_CONNECTIONSTRING);
-
+echo "will use ".(SQLITE3DB_NATIVE_DRIVER?" native sqlite3 ":"PDO_sqlite3")." driver\n";
 # put on the devel mode (3 will print all queries and errors)
 $db->beverbose = 3;
 
