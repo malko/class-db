@@ -6,7 +6,7 @@
 
 require('../class-db.php');
 # define the connection string
-define('DB_CONNECTIONSTRING','sqlite3db:///tmp/test.db');
+define('DB_CONNECTIONSTRING','sqlite3db://'.$_ENV['TMPDIR'].'/test.db');
 
 # get a single instance of the class from anywhere in your script
 $db = db::getInstance(DB_CONNECTIONSTRING);
@@ -127,7 +127,7 @@ $db->query('DROP TABLE test;');
 $db->query('DROP TABLE owners;');
 $db->query('DROP TABLE owners_desc;');
 $db->close();
-unlink('/tmp/test.db');
+unlink($ENV['TMPDIR'].'/test.db');
 
 # print out the profiler result (click on the title for detail)
 dbProfiler::printReport();

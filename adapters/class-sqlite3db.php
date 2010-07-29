@@ -162,7 +162,7 @@ class sqlite3db extends db{
 		}else{
 			$res = $this->db->exec($Q_str);
 		}
-		if(! $res)
+		if(false === $res)
 			$this->set_error(__FUNCTION__);
 
 		return $res;
