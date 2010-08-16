@@ -132,7 +132,7 @@ class dbProfiler{
 		return stripslashes(htmlentities(var_export($a,1),ENT_NOQUOTES,$charset));
 	}
 
-	static function printReport(){
+	static function printReport($return=false){
 		if(! count(self::$stats) )
 			return;
 		$total = 0;
@@ -143,7 +143,7 @@ class dbProfiler{
 			$rows[] = '<tr><td style="display:none;border-bottom:solid silver 1px;vertical-align:top;background:#ffe;color:#664;white-space:nowrap;" colspan="3">'.$trace.'</td></tr>';
 			$total += $time;
 		}
-		echo '
+		$str = '
 		<script type="text/javascript">
 			if( typeof displayDbProfilerReport == "undefined"){
 				var extendedDbProfilerDisplay = function(){
@@ -185,6 +185,10 @@ class dbProfiler{
 		<tfoot><tr><td><b>Total: '.count(self::$stats).' queries</b></td><td>&nbsp;</td><td><b>Total time: '.$total.'sec</b></td></tr></tfoot>
 		<tbody id="dbProfilerReport" style="display:none;">'.implode('',$rows)."</tbody>
 		</table>";
+		if( $return )
+			return $str;
+		else
+			echo $str;
 	}
 
 	function get_microtime(){

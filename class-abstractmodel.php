@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-08-09 - now abstractmodel::_methodExists() manage a third parameter $avoidStatic to make it consider static methods as invalid
+*                         - abstractmodel::existsModelPK() bug correction on empty PK
 *            - 2010-07-07 - some memory and speed improvements
 *            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
 *                         - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
@@ -913,7 +915,7 @@ class modelCollection extends arrayObject{
 		$propDef = abstractModel::_getModelStaticProp($this->collectionType,'datasDefs');
 		if( empty($propDef[$sortBy]) ){
 			#- check for getter for this property
-			if(! $this->current()->_methodExists('get'.ucfirst($sortBy)) )
+			if(! $this->current()->_methodExists('get'.ucfirst($sortBy),false,true) )
 				throw new Exception('Try to sort an unsortable property');
 			if( null === $sortType)
 				$sortType = 'std';
@@ -1824,8 +1826,8 @@ abstract class abstractModel{
 		$tableName  = self::_getModelStaticProp($modelName,'tableName');
 		$primaryKey = self::_getModelStaticProp($modelName,'primaryKey');
 		$db = self::getModelDbAdapter($modelName);
-		$PKExists     = $db->select_value($tableName,$primaryKey,array('WHERE '.$db->protect_field_names($primaryKey).'=?',$PK));
-		return $valids[$modelName][$PK]=$PKExists?true:false;
+		$PKExists   = $db->select_value($tableName,$primaryKey,array('WHERE '.$db->protect_field_names($primaryKey).'=?',$PK));
+		return $valids[$modelName][$PK]=$PKExists!==false?true:false;
 	}
 
 	/**
@@ -1932,19 +1934,25 @@ abstract class abstractModel{
 	* check if a method is supported by current instance of the object (also check if modelAddon overload the method)
 	* @param string $methodName
 	* @param bool   $returnCallable if set to true return callable instead of bool
+	* @param bool   $avoidStatic if true will not consider static method as true
 	* @return bool or callable depending on $returnCallable value
 	* @see call_user_func for callable definition
 	*/
-	public function _methodExists($methodName,$returnCallable=false){
+	public function _methodExists($methodName,$returnCallable=false,$avoidStatic=false){
 		#- first check for modelAddons overloaded methods
 		foreach($this->_modelAddons as $addon){
 			if( $addon->isModelMethodOverloaded($methodName) )
 				return $returnCallable?array($addon,$methodName):true;
 		}
-		#- then check inside the instance
-		if( method_exists($this,$methodName) )
+		#- then check inside the instance (and avoid returning static method as existant)
+		if( method_exists($this,$methodName) ){
+			if( $avoidStatic ){
+				$tmp = new ReflectionMethod($this,$methodName);
+				if( $tmp->isStatic() )
+					return false;
+			}
 			return $returnCallable?array($this,$methodName):true;
-
+		}
 		return false;
 	}
 	/**
@@ -1967,7 +1975,7 @@ abstract class abstractModel{
 			return $this->datas[self::_getModelStaticProp($this,'primaryKey')];
 
 		#- if  user defined getter exists we just call it and return
-		if( $this->_methodExists("get$k") )
+		if( $this->_methodExists("get$k",false,true) )
 			return $this->{"get$k"}();
 
 		$hasOne = self::_getModelStaticProp($this,'hasOne');
@@ -2002,7 +2010,7 @@ abstract class abstractModel{
 				return false;
 			}
 			#- call user defined setter first
-			if( $this->_methodExists("set$k") ){
+			if( $this->_methodExists("set$k",false,true) ){
 				$this->{"set$k"}($v);
 				return $v;
 			}
@@ -2136,7 +2144,7 @@ abstract class abstractModel{
 		if(preg_match('!^append(_new|New)?_?('.self::$_internals[$className]['hasManyKeyExp'].')$!',$m,$match) ){
 			$relName = self::_cleanKey($this,'hasMany',$match[2]);
 			if($relName===false)
-				throw new Exception("$className trying to call unknown method $m with no matching hasMany[$match[1]] definition.");
+				throw new BadMethodCallException("$className trying to call unknown method $m with no matching hasMany[$match[1]] definition.");
 			$modelCollection = $this->getRelated($relName);
 			$model = array_shift($a);
 			$hasMany = self::_getModelStaticProp($this,'hasMany');
@@ -2155,14 +2163,14 @@ abstract class abstractModel{
 			$relName = self::_cleanKey($this,'hasMany',$match[1]);
 			$relDef = self::_getModelStaticProp($this->modelName,'hasMany');
 			if($relName === false)
-				throw new Exception("$className::$m unknown hasMany relation.");
+				throw new BadMethodCallException("$className::$m unknown hasMany relation.");
 			if( count($a) !== 1 )
-				throw new Exception("$className::$m invalid count of parameters");
+				throw new InvalidArgumentException("$className::$m invalid count of parameters");
 			$collection = $a[0];
 			if(is_array($collection))
 				$collection = modelCollection::init($relDef[$relName]['modelName'],$collection);
 			elseif(! $collection instanceof modelCollection )
-				throw new Exception("$className::$m invalid parameter $collection given, modelCollection expected.");
+				throw new InvalidArgumentException("$className::$m invalid parameter $collection given, modelCollection expected.");
 			$this->_manyModels[$relName] = $collection;
 			#- set la relation dans l'autre sens
 			if(! empty($relDef[$relName]['foreignField']) )
@@ -2260,7 +2268,7 @@ abstract class abstractModel{
 				$this->{$k} = $v;
 			}elseif(isset($hasMany[$k])){
 				$this->{'set'.$k.'Collection'}($v);
-			}elseif( $this->_methodExists('set'.$k)){
+			}elseif( $this->_methodExists('set'.$k,false,true)){
 				$this->{'set'.$k}($v);
 			}
 		}
@@ -2354,7 +2362,7 @@ abstract class abstractModel{
 		if( empty($filters[$k]) ){
 			$filterName = "filter$k";
 			#- first look inside model for a filterMethod
-			if( $this->_methodExists($filterName) )
+			if( $this->_methodExists($filterName,false,true) )
 				return $this->{$filterName}($v);
 			#- if no filtering methods was found at all then just return value
 			return $v;
