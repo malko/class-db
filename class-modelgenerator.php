@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-09-13 - make $_has[One|Many] static property of extended models public as a workaround for buggy get_class_vars scope resolution
 *            - 2009-06-25 - better detection of ignored relationship on fields NO NULL with NULL as default
 *            - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
 *            - 2009-04-01 - $_avoidEmptyPK is now true by default
@@ -506,8 +507,9 @@ class $modelName extends BASE_$modelName{
 	/**
 	* Make use $modelName::\$_hasOne and/or $modelName::\$_hasMany if you want to override thoose defined in BASE_$modelName
 	* any key set to an empty value will be dropped, others will be appended if not exists or override if exists
-	* static protected \$_hasOne = array();
-	* static protected \$_hasMany = array();
+	* MUST BE PUBLIC (yes it's a shame) but get_class_vars presents bug in some php version
+	* static public \$_hasOne = array();
+	* static public \$_hasMany = array();
 	*/"
 	.(empty($methods)?'':"\n\n\t###--- AUTOGENERATION PROCESS PROPOSED THOOSE ADDITIONAL METHODS ---###".implode('',$methods)).
 	"

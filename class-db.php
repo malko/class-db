@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-09-28 - change empty sliceAttrs to false instead of '' because of weird extract behaviour on empty strings
 *            - 2010-07-07 - introduce freeResults method
 *            - 2010-05-20 - litle enhancement of trace display in dbProfiler::printReport()
 *            - 2010-03-24 - add optional parameter $fullSliceAttrs to select_slice() method
@@ -645,10 +646,10 @@ class db{
 		static $sliceAttrs;
 		if(! isset($sliceAttrs) ){
 			$sliceAttrs = array(
-				'firstDisabled' => '',
-				'prevDisabled'  => '',
-				'nextDisabled'  => '',
-				'lastDisabled'  => '',
+				'firstDisabled' => false,
+				'prevDisabled'  => false,
+				'nextDisabled'  => false,
+				'lastDisabled'  => false,
 				'first' => '<a href="%lnk" class="pagelnk"><big>&laquo;</big></a>',
 				'prev'  => '<a href="%lnk" class="pagelnk"><big>&lsaquo;</big></a>',
 				'next'  => '<a href="%lnk" class="pagelnk"><big>&rsaquo;</big></a>',

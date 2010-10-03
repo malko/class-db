@@ -11,150 +11,157 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2010-08-09 - now abstractmodel::_methodExists() manage a third parameter $avoidStatic to make it consider static methods as invalid
-*                         - abstractmodel::existsModelPK() bug correction on empty PK
-*            - 2010-07-07 - some memory and speed improvements
-*            - 2010-06-18 - modelCollection make sort methods php5.3 compliant
-*                         - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
-*            - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
-*            - 2010-06-09 - abstractmodel::__set() now always return passed value when call a user defined setter for more consistency
-*            - 2010-05-28 - abstractmodel::__set() bug correction on hasOne assignation
-*            - 2010-05-21 - abstractmodel::_getModelStaticProp() check for property existence before returning it
-*            - 2010-05-18 - abstractmodel::_setDatas() now also apply datas that only have a setter method
-*            - 2010-05-17 - some work made on hasOne relation setting when foreignField is not the primaryKey of related model
-*            - 2010-05-03 - some eval replacement/optim in modelCollection::filterBy() method
-*                         - abstractmodel::_initInternals() is now called at modelCollection::init() time.
-*                         - abstractmodel::_initInternals() now allow override/merge of $hasOne/$hasMany static properties by defining $_hasOne/$_hasMany static properties
-*            - 2010-04-13 - change modelCollection::remove() method to be chainable or return the removed node (no more boolean return)
-*            - 2010-04-07 - new method modelCollection::merge
-*                         - modelCollection::append() now return $this for method chaining and support appending a whole collection
-*            - 2010-03-24 - change abstractmodel::_setPagedNav() methods to use abstractmodel::$internals
-*                         - correct typo error when setting internal has*KeyExp
-*                         - new modelCollection::paged() method
-*            - 2010-03-16 - add use of db::protect_field_names() method at many places
-*            - 2009-12-09 - add support for modelAddons::_initModelType
-*            - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
-*            - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
-*            - 2009-10-26 - now __toString() allow escaping of % chars by a preceding backslash Or % (\%|%%)
-*            - 2009-10-01 - new modelCollection::isEmpty() method
-*            - 2009-09-30 - now abstractmodel::getRelated() check for living instance when getting hasOne relation on foreign unique key
-*            - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
-*            - 2009-07-08 - new modelCollection::slice() method
-*            - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
-*            - 2009-07-06 - bug correction in modelCollection::__construct() (forgotten continue)
-*            - 2009-07-02 - bug correction on cascading deletes on hasOne relations that are not set
-*                         - bug correction on abstractmodel::__get() on null values
-*                         - modelCollection now check for emptyPK at init time
-*            - 2009-07-01 - new method abstractmodel::getModelLivingInstances() that return a modelCollection of all instanciated given model
-*                         - new method abstractmodel::getModelDummyInstance() that does exactly what it says
-*            - 2009-06-24 - modelCollection::htmlOptions() now use __toString to render label (so supporte more complex expression)
-*            - 2009-06-23 - bug correction in _setDatas regarding setting unknown keys as collection
-*            - 2009-06-22 - modelCollection::shuffle() doesn't loadDatas anymore.
-*            - 2009-06-16 - bug correction on setting hasManyCollection on relations where relName was diffent from related modelName
-*            - 2009-06-12 - abstractmodel::getPagedModelInstances() suppress warning error on empty results sets
-*            - 2009-05-28 - now abstractmodel::_setDatas() can also set hasOne and hasMany relations
-*            - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
-*                         - bug correction in getFilteredModelInstance() with $_avoidEmptyPK set to true that returned temporary model instead of null on empty results. (back to normal behaviour, returning null)
-*            - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
-*                         - modelAddons::isModelMethodOverloaded() is now case insensitive
-*                         - modelCollection::__set() just pass value to models in it with no check at all
-*            - 2009-04-02 - modelCollection::sortCompare() now will work on hasOne related by using their primaryKey.
-*            - 2009-03-18 - modelCollection::__toString() take second parameter $separator again
-*                         - rewrite abstractmodel constructor, getModelInstance, getModelInstanceFromDatas to properly pass primaryKey value to modelAddons constructors (ie: when initialising collection).
-*            - 2009-03-17 - now abstractmodel::_setDatas() use directly the __set() method to permit call to _setDatas inside user defined setter.
-*                         - now setting a hasOne relation by primaryKey using __set (so most of common setter methods) will drop any previously loaded related object to ensure data integrity
-*            - 2009-03-13 - now __toString methods can render expression like %{expression}%
-*            - 2009-02-09 - new abstractModel statics methods _modelGetSupportedAddons() _modelSupportsAddon()
-*                         - new abstractModel::supportsAddon() method
-*            - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
-*            - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
-*            - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
-*                         - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())
-*            - 2009-01-15 - new abstractModel static property $_avoidEmptyPK that when setted to true will return make getInstance to work as getNew when called with an empty PK
-*                         - add abstractModel::__get() accessors to 'dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK' static properties
-*                         - modelCollection::__get() now check $_avoidEmptyPK when accessing models properties
-*                         - new modelCollection methods getTemporaries() and removeTemporaries()
-*            - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
-*            - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
-*                         - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
-*            - 2008-11-28 - bug correction in int type detection
-*                         - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
-*            - 2008-11-27 - little modification in type detection
-*                         - new modelCollection::min[_?FieldName]([FieldName]) modelCollection::max[_?FieldName]([FieldName]) methods
-*            - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
-*            - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
-*            - 2008-10-07 - bug correction (typo error in getRelated methods)
-*            - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
-*                         - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
-*            - 2008-09-01 - new modelCollection::sum() and modelCollection::avg() methods
-*                         - modelCollection::__call() now manage (sum|avg)[_]PropertyName() methods
-*                         - __toString() now use heredoc syntax to permit only one call to eval by model idem for collections (small optimisation)
-*            - 2008-08-29 - new modelCollection::getPropertyList() method
-*                         - new modelCollection::getPropertiesList() method
-*                         - modelCollection::filterBy() and modelCollection::__get() now use modelCollection::getPropertyList()
-*                         - modelCollection::__call() now manage get[_]PropertyNameList() methods
-*                         - abstractModel::_cleanKey() now can check multiple keyType at once
-*            - 2008-08-28 - modelCollection::filterBy() now work on related objects properties
-*            - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
-*                         - modelCollection::__call() now manage map[_]FieldName methods
-*                         - new abstractModel::getFilteredModelInstance() method
-*            - 2008-08-20 - now modelCollection::filterBy() support in,!in,IN,!IN operators for in_array comparisons
-*                         - modelCollection::(in|de)crement() now call modelCollection::loadDatas() first
-*                         - now setting model datas values will only change needSave state to 1 if set to a new value;
-*            - 2008-08-19 - new modelCollection dynamic methods, filterBy[_]FieldName and [r]sortBy[_]FieldName
-*                         - __call now will call each instance methods and return their result as an array if no dynamic method was found
-*            - 2008-08-12 - new modelCollection::__toString() method
-*                         - add parameter $formatStr to modelCollection::__toString() and abstractModel::__toString() methods to override default format on explicit call
-*                         - modelCollection::htmlOptions() now call modelCollection::loadDatas() prior to rendering
-*            - 2008-08-06 - modelCollection::htmlOptions() will use default model::__toString() method to render empty labels
-*            - 2008-08-05 - add property and method __toString to abstractModel to ease string representation
-*            - 2008-07-30 - bug correction in modelCollection::increment/decrement
-*            - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
-*            - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
-*            - 2008-07-23 - modelCollection::htmlOptions() can now take a collection or array as $selected parameter for multiple selection options
-*            - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
-*                         - setting related hasOne model by primaryKey will now set the correct type in the model datas array
-*            - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
-*                         - add remove method to modelCollection
-*            - 2008-05-08 - add abstractModel static public property $dfltFiltersDictionary to permit filterMsgs to be lookedUp in dictionaries (specific to simpleMVC)
-*                         - add sprintf support to appendFilterMsg() method
-*            - 2008-05-06 - now modelCollection::loadDatas() reset tmpAbstracModel keys
-*                         - modelCollection now implement method to create htmlOptions from models handles in it
-*                         - abstractModels can now access some static properties (primaryKey,tableName,modelName) as normal instance properties
-*            - 2008-05-05 - rewrite modelCollection::current() and add prev(), next(), first() and last() methods
-*                           all returning abtractModel or null
-*                         - add new methods support to modelCollection:
-*                           - increment/decrement methods (in|de)crementPropertyName($step=1)
-*                           - filtering method filterBy($propertyName,$exp,$comparisonOperator)
-*                           - mapping method map($callBack,$propertyName=null)
-*                           - cloning method clonedCollection()
-*                         - add $leaveNeedSaveState to permit to set instances by datas wihtout setting $needSave to 1
-*            - 2008-05-04 - add $isDummyInstance internal parameter to abstractModel::__construct
-*            - 2008-05-02 - some more methods to set datasTypes now addons can load modelInstance datas.
-*            - 2008-04-30 - now _makeModelStaticCall and getModelDbAdapter can take instance of model as first parameter instead of string
-*                         - add support for modelAddons
-*            - 2008-04-25 - new  sort and rsort methods for modelCollection.
-*            - 2008-04-xx - so many changes that i didn't mentioned them as we weren't in any "stable" or even "alpha" release
-*                           now that we have a more usable version i will write changes again
-*            - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
-*                         - methods append_relName || appendRelName to add related object to hasMany relations
-*                         - methods set_relName_collection || setRelNameCollection to set an entire modelCollection as a hasMany relation
-*                         - method save on modelCollection
-*                         - don't load unsetted related object at save time
-*            - 2008-03-30 - separation of modelGenerator class in its own file
-*                         - remove the withRel parameter everywhere (will be replaced with dynamic loading everywhere)
-*                         - replace old relational defs (one2*) by hasOne and hasMany defs instead
-*            - 2008-03-25 - some change in modelCollection and apparition of modelCollectionIterator.
-*                           now models can be setted with only their PK and be retrieved only on demand (dynamic loading)
-*            - 2008-03-24 - now you can have user define methods for setting and filtering datas
-*                         - new methods filterDatas, appendFiltersMsgs and hasFiltersMsgs (to ease the creation of user define filter methods)
-*                         - getFiltersMsgs can now take a parameter to reset messages
-*            - 2008-03-23 - better model generation :
-*                           * support autoMapping
-*                           * can overwrite / append / or skip existing models
-*                           * can set a constant as dbConnectionStr
-*                         - new class modelCollection that permitt some nice tricks (thanks to SPL)
-*            - 2008-03-15 - now can get and add related one2many objects
+* - 2010-09-27 - attempt in abstractmodel::save to set reverse relation on newly saved models
+* - 2010-09-17 - on[before|after]save now called even if needSave < 1
+*              - add some more fieldName protection
+* - 2010-09-16 - now abstractModel::append[New][hasMany] and abstractModel::set[hasMany]Collection force needSave to 1
+* - 2010-09-13 - make $_has[One|Many] static property of extended models public as a workaround for buggy get_class_vars scope resolution
+* - 2010-08-16 - cleaning exceptions
+* - 2010-08-13 - first attempt implementing abstractModel::getFilteredHasMany(propertyName,exp,comparisonOperator)
+* - 2010-08-09 - now abstractmodel::_methodExists() manage a third parameter $avoidStatic to make it consider static methods as invalid
+*              - abstractmodel::existsModelPK() bug correction on empty PK
+* - 2010-07-07 - some memory and speed improvements
+* - 2010-06-18 - modelCollection make sort methods php5.3 compliant
+*              - onBefore[save|delete] and onAfter[save|delete] are now only called on needSave state > 1
+* - 2010-06-10 - abstractmodel add support for onAfter[delete|save] methods
+* - 2010-06-09 - abstractmodel::__set() now always return passed value when call a user defined setter for more consistency
+* - 2010-05-28 - abstractmodel::__set() bug correction on hasOne assignation
+* - 2010-05-21 - abstractmodel::_getModelStaticProp() check for property existence before returning it
+* - 2010-05-18 - abstractmodel::_setDatas() now also apply datas that only have a setter method
+* - 2010-05-17 - some work made on hasOne relation setting when foreignField is not the primaryKey of related model
+* - 2010-05-03 - some eval replacement/optim in modelCollection::filterBy() method
+*              - abstractmodel::_initInternals() is now called at modelCollection::init() time.
+*              - abstractmodel::_initInternals() now allow override/merge of $hasOne/$hasMany static properties by defining $_hasOne/$_hasMany static properties
+* - 2010-04-13 - change modelCollection::remove() method to be chainable or return the removed node (no more boolean return)
+* - 2010-04-07 - new method modelCollection::merge
+*              - modelCollection::append() now return $this for method chaining and support appending a whole collection
+* - 2010-03-24 - change abstractmodel::_setPagedNav() methods to use abstractmodel::$internals
+*              - correct typo error when setting internal has*KeyExp
+*              - new modelCollection::paged() method
+* - 2010-03-16 - add use of db::protect_field_names() method at many places
+* - 2009-12-09 - add support for modelAddons::_initModelType
+* - 2009-11-26 - replace all isset($this->datas[]) by $this->datasDefs[])
+* - 2009-11-23 - move __toString to _toString method for compatibility with php5.3
+* - 2009-10-26 - now __toString() allow escaping of % chars by a preceding backslash Or % (\%|%%)
+* - 2009-10-01 - new modelCollection::isEmpty() method
+* - 2009-09-30 - now abstractmodel::getRelated() check for living instance when getting hasOne relation on foreign unique key
+* - 2009-09-29 - bug correction in modelCollection::__get() when getting hasOne relation on foreign unique key
+* - 2009-07-08 - new modelCollection::slice() method
+* - 2009-07-07 - now [r]sort can sort properties get by user defined getter (abstractmodel::getPropertyName()). (don't work for dynamic methods [r]sortPropertyname)
+* - 2009-07-06 - bug correction in modelCollection::__construct() (forgotten continue)
+* - 2009-07-02 - bug correction on cascading deletes on hasOne relations that are not set
+*              - bug correction on abstractmodel::__get() on null values
+*              - modelCollection now check for emptyPK at init time
+* - 2009-07-01 - new method abstractmodel::getModelLivingInstances() that return a modelCollection of all instanciated given model
+*              - new method abstractmodel::getModelDummyInstance() that does exactly what it says
+* - 2009-06-24 - modelCollection::htmlOptions() now use __toString to render label (so supporte more complex expression)
+* - 2009-06-23 - bug correction in _setDatas regarding setting unknown keys as collection
+* - 2009-06-22 - modelCollection::shuffle() doesn't loadDatas anymore.
+* - 2009-06-16 - bug correction on setting hasManyCollection on relations where relName was diffent from related modelName
+* - 2009-06-12 - abstractmodel::getPagedModelInstances() suppress warning error on empty results sets
+* - 2009-05-28 - now abstractmodel::_setDatas() can also set hasOne and hasMany relations
+* - 2009-04-30 - new sortType 'shuffle' and new modelCollection::shuffle method.
+*              - bug correction in getFilteredModelInstance() with $_avoidEmptyPK set to true that returned temporary model instead of null on empty results. (back to normal behaviour, returning null)
+* - 2009-04-03 - modelCollection::filterBy() partially rewrited to work on hasOne related for all comparison type (only work with primaryKeys when comparing hasOne property)
+*              - modelAddons::isModelMethodOverloaded() is now case insensitive
+*              - modelCollection::__set() just pass value to models in it with no check at all
+* - 2009-04-02 - modelCollection::sortCompare() now will work on hasOne related by using their primaryKey.
+* - 2009-03-18 - modelCollection::__toString() take second parameter $separator again
+*              - rewrite abstractmodel constructor, getModelInstance, getModelInstanceFromDatas to properly pass primaryKey value to modelAddons constructors (ie: when initialising collection).
+* - 2009-03-17 - now abstractmodel::_setDatas() use directly the __set() method to permit call to _setDatas inside user defined setter.
+*              - now setting a hasOne relation by primaryKey using __set (so most of common setter methods) will drop any previously loaded related object to ensure data integrity
+* - 2009-03-13 - now __toString methods can render expression like %{expression}%
+* - 2009-02-09 - new abstractModel statics methods _modelGetSupportedAddons() _modelSupportsAddon()
+*              - new abstractModel::supportsAddon() method
+* - 2009-02-08 - add forgotten support for optional abstractModel::onBeforeDelete() method
+* - 2009-01-26 - new abstractModel::_methodExists method to check method inside current instance and attached modelAddons all at once
+* - 2009-01-21 - now modelCollection sum,max,min methods return 0 on empty collection
+*              - add PK to dataFields check expression so many dynamic methods are now callable with with PK (ie: modelCollection->sortByPK())
+* - 2009-01-15 - new abstractModel static property $_avoidEmptyPK that when setted to true will return make getInstance to work as getNew when called with an empty PK
+*              - add abstractModel::__get() accessors to 'dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK' static properties
+*              - modelCollection::__get() now check $_avoidEmptyPK when accessing models properties
+*              - new modelCollection methods getTemporaries() and removeTemporaries()
+* - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
+* - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
+*              - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
+* - 2008-11-28 - bug correction in int type detection
+*              - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
+* - 2008-11-27 - little modification in type detection
+*              - new modelCollection::min[_?FieldName]([FieldName]) modelCollection::max[_?FieldName]([FieldName]) methods
+* - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
+* - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
+* - 2008-10-07 - bug correction (typo error in getRelated methods)
+* - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
+*              - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
+* - 2008-09-01 - new modelCollection::sum() and modelCollection::avg() methods
+*              - modelCollection::__call() now manage (sum|avg)[_]PropertyName() methods
+*              - __toString() now use heredoc syntax to permit only one call to eval by model idem for collections (small optimisation)
+* - 2008-08-29 - new modelCollection::getPropertyList() method
+*              - new modelCollection::getPropertiesList() method
+*              - modelCollection::filterBy() and modelCollection::__get() now use modelCollection::getPropertyList()
+*              - modelCollection::__call() now manage get[_]PropertyNameList() methods
+*              - abstractModel::_cleanKey() now can check multiple keyType at once
+* - 2008-08-28 - modelCollection::filterBy() now work on related objects properties
+* - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
+*              - modelCollection::__call() now manage map[_]FieldName methods
+*              - new abstractModel::getFilteredModelInstance() method
+* - 2008-08-20 - now modelCollection::filterBy() support in,!in,IN,!IN operators for in_array comparisons
+*              - modelCollection::(in|de)crement() now call modelCollection::loadDatas() first
+*              - now setting model datas values will only change needSave state to 1 if set to a new value;
+* - 2008-08-19 - new modelCollection dynamic methods, filterBy[_]FieldName and [r]sortBy[_]FieldName
+*              - __call now will call each instance methods and return their result as an array if no dynamic method was found
+* - 2008-08-12 - new modelCollection::__toString() method
+*              - add parameter $formatStr to modelCollection::__toString() and abstractModel::__toString() methods to override default format on explicit call
+*              - modelCollection::htmlOptions() now call modelCollection::loadDatas() prior to rendering
+* - 2008-08-06 - modelCollection::htmlOptions() will use default model::__toString() method to render empty labels
+* - 2008-08-05 - add property and method __toString to abstractModel to ease string representation
+* - 2008-07-30 - bug correction in modelCollection::increment/decrement
+* - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
+* - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
+* - 2008-07-23 - modelCollection::htmlOptions() can now take a collection or array as $selected parameter for multiple selection options
+* - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
+*              - setting related hasOne model by primaryKey will now set the correct type in the model datas array
+* - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
+*              - add remove method to modelCollection
+* - 2008-05-08 - add abstractModel static public property $dfltFiltersDictionary to permit filterMsgs to be lookedUp in dictionaries (specific to simpleMVC)
+*              - add sprintf support to appendFilterMsg() method
+* - 2008-05-06 - now modelCollection::loadDatas() reset tmpAbstracModel keys
+*              - modelCollection now implement method to create htmlOptions from models handles in it
+*              - abstractModels can now access some static properties (primaryKey,tableName,modelName) as normal instance properties
+* - 2008-05-05 - rewrite modelCollection::current() and add prev(), next(), first() and last() methods
+*                all returning abtractModel or null
+*              - add new methods support to modelCollection:
+*                - increment/decrement methods (in|de)crementPropertyName($step=1)
+*                - filtering method filterBy($propertyName,$exp,$comparisonOperator)
+*                - mapping method map($callBack,$propertyName=null)
+*                - cloning method clonedCollection()
+*              - add $leaveNeedSaveState to permit to set instances by datas wihtout setting $needSave to 1
+* - 2008-05-04 - add $isDummyInstance internal parameter to abstractModel::__construct
+* - 2008-05-02 - some more methods to set datasTypes now addons can load modelInstance datas.
+* - 2008-04-30 - now _makeModelStaticCall and getModelDbAdapter can take instance of model as first parameter instead of string
+*              - add support for modelAddons
+* - 2008-04-25 - new  sort and rsort methods for modelCollection.
+* - 2008-04-xx - so many changes that i didn't mentioned them as we weren't in any "stable" or even "alpha" release
+*                now that we have a more usable version i will write changes again
+* - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
+*              - methods append_relName || appendRelName to add related object to hasMany relations
+*              - methods set_relName_collection || setRelNameCollection to set an entire modelCollection as a hasMany relation
+*              - method save on modelCollection
+*              - don't load unsetted related object at save time
+* - 2008-03-30 - separation of modelGenerator class in its own file
+*              - remove the withRel parameter everywhere (will be replaced with dynamic loading everywhere)
+*              - replace old relational defs (one2*) by hasOne and hasMany defs instead
+* - 2008-03-25 - some change in modelCollection and apparition of modelCollectionIterator.
+*                now models can be setted with only their PK and be retrieved only on demand (dynamic loading)
+* - 2008-03-24 - now you can have user define methods for setting and filtering datas
+*              - new methods filterDatas, appendFiltersMsgs and hasFiltersMsgs (to ease the creation of user define filter methods)
+*              - getFiltersMsgs can now take a parameter to reset messages
+* - 2008-03-23 - better model generation :
+*                * support autoMapping
+*                * can overwrite / append / or skip existing models
+*                * can set a constant as dbConnectionStr
+*              - new class modelCollection that permitt some nice tricks (thanks to SPL)
+* - 2008-03-15 - now can get and add related one2many objects
 * @todo replace all getModel/setModel methods by modelGet/modelSet to avoid collision with dynamicly defined get/set methods
 * @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
 *       require php >= 5.3 features such as late static binding and __callstatic() magic method
@@ -287,7 +294,7 @@ class modelCollection extends arrayObject{
 	static public function init(){
 		$args = func_get_args();
 		if(! isset($args[0]) )
-			throw new Exception('modelCollection::init() missing required parameter collection type');
+			throw new RuntimeException('modelCollection::init() missing required parameter collection type');
 		$collectionType = $args[0];
 		$modelList = isset($args[1])?$args[1]:null;
 
@@ -315,7 +322,7 @@ class modelCollection extends arrayObject{
 			return $this;
 		}
 		if(! $value instanceof $this->collectionType)
-			throw new Exception("modelCollection::$this->collectionType can only append $this->collectionType models");
+			throw new InvalidArgumentException("modelCollection::$this->collectionType can only append $this->collectionType models");
 		$index=$value->PK;
 		$this->offsetSet($index, $value);
 		return $this;
@@ -916,7 +923,7 @@ class modelCollection extends arrayObject{
 		if( empty($propDef[$sortBy]) ){
 			#- check for getter for this property
 			if(! $this->current()->_methodExists('get'.ucfirst($sortBy),false,true) )
-				throw new Exception('Try to sort an unsortable property');
+				throw new OutOfBoundsException('Try to sort an unsortable property');
 			if( null === $sortType)
 				$sortType = 'std';
 		}
@@ -930,7 +937,7 @@ class modelCollection extends arrayObject{
 			else
 				$sortType = 'natc';
 		}elseif( (! in_array($sortType,array('std','nat','natc','bin','binc'),true)) && ! is_callable($sortType)){
-			throw new Exception('modelCollection::sort() call with invalid sortType parameter');
+			throw new UnexpectedValueException('modelCollection::sort() call with invalid sortType parameter');
 		}
 		$this->_sortType = $sortType;
 		#- ensure datas are loaded to avoid multiple on demand loading
@@ -1026,18 +1033,18 @@ class modelCollection extends arrayObject{
 
 		$relDefs = abstractModel::modelHasRelDefs($this->collectionType,null,true);
 		if( isset($relDefs['hasMany'][$propertyName]) )#-- comparison on related hasMany is not implemented for now
-			throw new Exception("modelCollection::filterBy('$propertyName') can't work on a hasMany property");
+			throw new OutOfBoundsException("modelCollection::filterBy('$propertyName') can't work on a hasMany property");
 		if( isset($relDefs['hasOne'][$propertyName]) ){#-- comparison on related hasOne only compare primary keys
 			$modelName = $relDefs['hasOne'][$propertyName]['modelName'];
 			foreach($comparisonDatas as $k=>$v)
 				$comparisonDatas[$k] = ($v instanceof abstractModel?$v->PK:$v);
 			if( $exp instanceof abstractModel){
 				if(! $exp instanceof $modelName)
-					throw new Exception("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
+					throw new InvalidArgumentException("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
 				$exp = $exp->PK;
 			}elseif($exp instanceof modelCollection){
 				if( $exp->collectionType !== $modelName)
-					throw new Exception("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
+					throw new InvalidArgumentException("modelCollection::filterBy('$propertyName') call with invalid \$exp parameter");
 				$exp = $exp->keys();
 			}elseif(is_array($exp)){
 				foreach($exp as $k=>$v){
@@ -1356,10 +1363,10 @@ abstract class abstractModel{
 	*/
 	static private $_internals = array('_pagedNav'=>array());
 	static public $_pagedNavDefault = array(
-		'firstDisabled' => '',
-		'prevDisabled'  => '',
-		'nextDisabled'  => '',
-		'lastDisabled'  => '',
+		'firstDisabled' => false,
+		'prevDisabled'  => false,
+		'nextDisabled'  => false,
+		'lastDisabled'  => false,
 		'first' => '<a href="%lnk" class="pagelnk"><big>&laquo;</big></a>',
 		'prev'  => '<a href="%lnk" class="pagelnk"><big>&lsaquo;</big></a>',
 		'next'  => '<a href="%lnk" class="pagelnk"><big>&rsaquo;</big></a>',
@@ -1709,7 +1716,7 @@ abstract class abstractModel{
 			throw new InvalidArgumentException(__class__.'::'.__function__.'() invalid parameter filterType('.$filterType.') must be one of '.implode('|',array_keys($filterTypes)).'.');
 		$field = self::_cleanKey($modelName,'datasDefs',$field);
 		if($field === false)
-			throw new InvalidArgumentException(__class__.'::'.__function__.'() invalid parameter field('.$field.') must be a valid datas fieldName.');
+			throw new OutOfBoundsException(__class__.'::'.__function__.'() invalid parameter field('.$field.') must be a valid datas fieldName.');
 		if(! is_array($args) )
 			$args = array($args);
 		$field = abstractModel::getModelDbAdapter($modelName)->protect_field_names($field);
@@ -1901,7 +1908,7 @@ abstract class abstractModel{
 				if( empty($relDef['orderBy']) ){
 					$PKs = $this->dbAdapter->select_col(
 						$relDef['linkTable'],
-						$relDef['linkForeignField'],
+						$this->dbAdapter->protect_field_names($relDef['linkForeignField']),
 						array('WHERE '.$this->dbAdapter->protect_field_names($relDef['linkLocalField']).'=?',$localFieldVal)
 					);
 				}else{
@@ -1909,7 +1916,7 @@ abstract class abstractModel{
 					$relPrimaryKey = self::_getModelStaticProp($relDef['modelName'],'primaryKey');
 					$PKs = $this->dbAdapter->select_col(
 						"$relDef[linkTable] LEFT JOIN $relTable ON $relDef[linkTable].$relDef[linkForeignField] = $relTable.$relPrimaryKey",
-						$relDef['linkForeignField'],
+						$this->dbAdapter->protect_field_names($relDef['linkForeignField']),
 						array(
 							'WHERE '.$this->dbAdapter->protect_field_names($relDef['linkTable']).'.'
 							.$this->dbAdapter->protect_field_names($relDef['linkLocalField'])
@@ -1923,7 +1930,7 @@ abstract class abstractModel{
 			}
 		}
 
-		throw new Exception(get_class($this)."::getRelated($relName) unknown relation");
+		throw new OutOfBoundsException(get_class($this)."::getRelated($relName) unknown relation");
 	}
 
 	public function isRelatedSet($k){
@@ -1993,7 +2000,7 @@ abstract class abstractModel{
 		if( in_array($k,array('modelName','tableName','primaryKey','datasDefs','hasOne','hasMany','filters','dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK'),1) )
 			return self::_getModelStaticProp($this,$k);
 		#- nothing left throw an exception
-		throw new Exception(get_class($this)."::$k unknown property.");
+		throw new OutOfBoundsException(get_class($this)."::$k unknown property.");
 	}
 
 	/**
@@ -2001,7 +2008,7 @@ abstract class abstractModel{
 	*/
 	public function __set($k,$v){
 		if($k === 'PK' || $k === self::_getModelStaticProp($this,'primaryKey') )
-			throw new Exception(get_class($this)." primaryKey can not be set by user.");
+			throw new RuntimeException(get_class($this)." primaryKey can not be set by user.");
 
 		#- apply filters
 		if(! $this->bypassFilters){
@@ -2024,7 +2031,7 @@ abstract class abstractModel{
 			if( $this->bypassFilters ){ //-- bypass filter so make a quicker version
 				if( is_object($v) ){
 					if(! $v instanceof $relModelName)
-						throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
+						throw new UnexpectedValueException(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
 					$this->_oneModels[$k] = $v;
 					if(isset($this->datasDefs[$localField]) && $localField !== $thisPrimaryKey){
 						$this->datas[$localField] = $v->datas[empty($hasOne[$k]['foreignField'])?$v->primaryKey:$hasOne[$k]['foreignField']];
@@ -2042,7 +2049,7 @@ abstract class abstractModel{
 			$foreignField   = empty($hasOne[$k]['foreignField'])? $foreignPrimaryKey : $hasOne[$k]['foreignField'];
 			if( is_object($v) ){
 				if(! $v instanceof $relModelName)
-					throw new Exception(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
+					throw new UnexpectedValueException(get_class($this)." error while trying to set an invalid $k value(".get_class($v).").");
 				$this->_oneModels[$k] = $v;
 				if(isset($this->datasDefs[$localField]) && $localField !== $thisPrimaryKey)
 					$this->datas[$localField] = $v->datas[$foreignField];
@@ -2074,7 +2081,7 @@ abstract class abstractModel{
 				case 'requiredBy': #- as we don't rely on this relation there's no such big deal to be confident in the user to give correct value,
 				case 'ignored':    #- at least if datas are really invalid it will trigger a database error at save time
 					if($localField===$thisPrimaryKey)
-						throw new Exception(get_class($this)." error while trying to set an invalid $k value($v).");
+						throw new UnexpectedValueException(get_class($this)." error while trying to set an invalid $k value($v).");
 					$this->datas[$localField] = self::setModelDatasType($this,$localField,$v);
 					break;
 			}
@@ -2110,7 +2117,7 @@ abstract class abstractModel{
 			}
 		}
 
-		throw new Exception(get_class($this)." trying to set unknown property $k.");
+		throw new OutOfBoundsException(get_class($this)." trying to set unknown property $k.");
 
 	}
 
@@ -2126,6 +2133,7 @@ abstract class abstractModel{
 	*   (also have appendNew[_hasManyName|HasManyName] equal to append[_hasManyName|HasManyName](null))
 	* - set[_hasManyName|HasManyName]Collection(array|modelCollection $collection) and return this
 	* - get[_has*Name|Has*Name]() is shorthand for getRelated($has*Name) see getRelated() methods for more infos
+	* - getFiltered[_hasManyName|HasManyName]($propertyName,$exp,$comparisonOperator=null) sort of $this->getRelated()->getFilteredBy() trying to be optimized
 	* - get[_dataKey|DataKey]() return the corresponding value in this->datas
 	* - set[_dataKey|DataKey]($value,$bypassFilters=false,$leaveNeedSaveState=false) shortHand for _setData($dataKey,...) return this
 	* if none of above methods are found then will throw an exception
@@ -2155,6 +2163,7 @@ abstract class abstractModel{
 				$this->needSave = 1;
 			if( isset($hasMany[$relName]['foreignField']) ) # set reverse relation
 				$model->{$hasMany[$relName]['foreignField']} = isset($hasMany[$relName]['localField'])?$this->{$hasMany[$relName]['localField']}:$this->PK;
+			$this->needSave = 1; //- mark as need save to force update of related collection when calling save on this element
 			return $match[1]?$model:$this;#- @todo make reflection on what should be return for now i think that allowing method chaining can be nice
 		}
 
@@ -2175,12 +2184,108 @@ abstract class abstractModel{
 			#- set la relation dans l'autre sens
 			if(! empty($relDef[$relName]['foreignField']) )
 				$this->_manyModels[$relName]->{$relDef[$relName]['foreignField']} = empty($relDef[$relName]['localField'])?$this->PK:$this->{$relDef[$relName]['localField']};
+			$this->needSave = 1; //- mark as need save to force update of related collection when calling save on this element
 			return $this; #- @todo make reflection on what should be return for now i thing that allowing method chaining can be nice
 		}
 
 		#- manage getter methods for related
-		if( preg_match('!^get_?('.self::$_internals[$className]['has*KeyExp'].')$!',$m,$match) )
-			return $this->getRelated(self::_cleanKey($this,'hasOne',$match[1]));
+		if( preg_match('!^get(Filtered)?_?('.self::$_internals[$className]['has*KeyExp'].')$!',$m,$match) ){
+			$relName = self::_cleanKey($this,'hasMany',$match[2]);
+			if( empty($match[1]) ){ //- no filter use getRelated
+				return $this->getRelated($relName);
+			}
+			if( count($a) < 2 ){
+				throw new InvalidArgumentException("$className::$m require at least 2 parameters");
+			}
+			$relDef = self::_getModelStaticProp($this->modelName,'hasMany');
+			$a[2] = isset($a[2])?$a[2]:null;
+			if( empty($relDef[$relName]) ){
+				throw new BadMethodCallException("$className trying to call unknown method $m with no matching hasMany[$relName] definition.");
+			}else if( !empty($this->_manyModels[$relName]) ){ //-- rel already loaded just apply filter on them
+				return $this->getRelated($relName)->filterBy($a[0],$a[1],$a[2]);
+			}else{ // rel isn't loaded we try to only retrieved what is asked from database
+				#- first check that we're working on a dataField else just load the heavy way
+				$relDatasDef = self::_getModelStaticProp($relName,'datasDefs');
+				if(! isset($relDatasDef[$a[0]]) ){
+					return $this->getRelated($relName)->filterBy($a[0],$a[1],$a[2]);
+				}
+				$condAddition = 'AND '.$this->dbAdapter->protect_field_names($a[0]).' ';
+				#-- prepare filter statement
+				switch($a[2]){
+					case '=':
+					case null:
+						$condAddition .= '= 2?';
+						break;
+					case '==':
+					case '===':
+					case '!=':
+					case '!==':
+						$condAddition .= preg_replace('!=+!','=',$a[2]).' 2?';
+						break;
+					case '=':
+					case '>':
+					case '<':
+					case '>=':
+					case '<=':
+						$condAddition .= $a[2].' 2?';
+						break;
+					case 'in':
+					case 'IN':
+						$condAddition .= 'IN (2?)';
+						if( $a[1] instanceof modelCollection)
+							$a[1] = $a[1]->keys();
+						break; //do nothing on those
+					case '!in':
+					case '!IN':
+						$condAddition .= 'NOT IN (2?)';
+						if( $a[1] instanceof modelCollection)
+							$a[1] = $a[1]->keys();
+						break;
+					default: //-- we don't support SQL translation for now wo so we default to load collection and apply filterBy on it
+						return $this->getRelated($relName)->filterBy($a[0],$a[1],$a[2]);
+						break;
+				}
+				#- @TODO this is a modified version of the getRelated on hasMany method should be merged in a unique private function for easyer maitenance
+				$relDef = $relDef[$relName];
+				#- check that this is not a relation based on an unsaved primaryKey
+				$lcPKField = self::_getModelStaticProp($this,'primaryKey');
+				if( empty($relDef['localField']) )
+					$relDef['localField'] = $lcPKField;
+				# if $this is a newly unsaved object it can't already have any existing related object relying on it's primaryKey so return an empty collection
+				if( $relDef['localField'] === $lcPKField && $this->isTemporary() ){
+					return modelCollection::init($relDef['modelName']);
+				}
+				$localFieldVal = $this->datas[$relDef['localField']];
+				if( empty($relDef['linkTable']) ){
+					$dbAdapter = abstractModel::getModelDbAdapter($relDef['modelName']);
+					return abstractModel::getFilteredModelInstances(
+						$relDef['modelName'],
+						array(
+							'WHERE '.$dbAdapter->protect_field_names($relDef['foreignField']).' =? '.$condAddition.(empty($relDef['orderBy'])?'':' ORDER BY '.$relDef['orderBy']),
+							$localFieldVal,
+							$a[1]
+						)
+					);
+				}else{
+					$relTable      = self::_getModelStaticProp($relDef['modelName'],'tableName');
+					$relPrimaryKey = self::_getModelStaticProp($relDef['modelName'],'primaryKey');
+					$PKs = $this->dbAdapter->select_col(
+						"$relDef[linkTable] LEFT JOIN $relTable ON $relDef[linkTable].$relDef[linkForeignField] = $relTable.$relPrimaryKey",
+						$this->dbAdapter->protect_field_names($relDef['linkForeignField']),
+						array(
+							'WHERE '.$this->dbAdapter->protect_field_names($relDef['linkTable']).'.'
+							.$this->dbAdapter->protect_field_names($relDef['linkLocalField'])
+							.'=? '.$condAddition.(empty($relDef['orderBy'])?'':' ORDER BY '.$relDef['orderBy']),
+							$localFieldVal,
+							$a[1]
+						)
+					);
+					$this->dbAdapter->freeResults();
+					return abstractModel::getMultipleModelInstances($relDef['modelName'],empty($PKs)?array():$PKs);
+				}
+			}
+			return $this->getRelated($relName);
+		}
 
 		#- manage setter/getter for datas ([gs]et_field|[gs]etField) case sensitive
 		if( preg_match('!^([gs]et)_?('.self::$_internals[$className]['datasKeyExp'].')$!',$m,$match) ){
@@ -2194,7 +2299,7 @@ abstract class abstractModel{
 		}
 
 		#- nothing left throw an exception
-		throw new Exception("$className trying to call unknown method $m.");
+		throw new BadMethodCallException("$className trying to call unknown method $m.");
 	}
 
 	###--- FILTER RELATED METHODS ---###
@@ -2329,7 +2434,7 @@ abstract class abstractModel{
 			return null;
 		$datasDefs = self::_getModelStaticProp($modelName,'datasDefs');
 		if(! isset($datasDefs[$key]) )
-			throw new exception((is_object($modelName)?get_class($modelName):$modelName)."::setModelDatasType() $key is not a valid datas key.");
+			throw new OutOfBoundsException((is_object($modelName)?get_class($modelName):$modelName)."::setModelDatasType() $key is not a valid datas key.");
 		return self::_setType($value,$datasDefs[$key]['Type']);
 	}
 	/**
@@ -2492,7 +2597,7 @@ abstract class abstractModel{
 		$hasMany = self::_getModelStaticProp($modelName,'hasMany');
 		if( $relType !== null){
 			if(! in_array($relType,array('requiredBy','dependOn','ignored'),true))
-				throw new Exception("$modelName::hasRelated('$relType') Invalid value for parameter relType");
+				throw new UnexpectedValueException("$modelName::hasRelated('$relType') Invalid value for parameter relType");
 			foreach($hasOne as $name=>$def){
 				if($def['relType']!==$relType)
 					unset($hasOne[$name]);
@@ -2603,7 +2708,7 @@ abstract class abstractModel{
 	*/
 	public function save(){
 		if($this->deleted)
-			throw new Exception(get_class($this)."::save($this->PK) Can't save a deleted model");
+			throw new RuntimeException(get_class($this)."::save($this->PK) Can't save a deleted model");
 		$needSave = $this->needSave;
 		# exit if already in saving state
 		if( $needSave < 0 )
@@ -2622,18 +2727,20 @@ abstract class abstractModel{
 		#- check related models that need to be save before
 		$waitForSave = array();
 		$linked      = array();
-		foreach(self::_getModelStaticProp($this,'hasOne') as $relName=>$relDef){
+		$oneRelDefs = self::_getModelStaticProp($this,'hasOne');
+		$manyRelDefs = self::_getModelStaticProp($this,'hasMany');
+		foreach($oneRelDefs as $relName=>$relDef){
 			switch($relDef['relType']){
 				case 'dependOn': #- we dependOn that one so must save it first
 					if(! isset($this->_oneModels[$relName])){
 						#- if we already have a value set in or a default one we can goes on else throw an exception
 						if(! isset($relDef['localField'])){
-							throw new Exception(get_class($this)."::save() require $relName to be set."); # must be an object
+							throw new RuntimeException(get_class($this)."::save() require $relName to be set."); # must be an object
 						}else{
 							$default = $datasDefs[$relDef['localField']]['Default'];
 							if( $default !== $this->datas[$relDef['localField']] )
 								continue; #- value already set to something we consider here that the value was previously set or at least that user have correctly set this
-							throw new Exception(get_class($this)."::save() require $relName to be set.");
+							throw new RuntimeException(get_class($this)."::save() require $relName to be set.");
 						}
 					}
 					$this->getRelated($relName)->save();
@@ -2652,7 +2759,7 @@ abstract class abstractModel{
 					break;
 			}
 		}
-		foreach(self::_getModelStaticProp($this,'hasMany') as $relName=>$relDef){
+		foreach($manyRelDefs as $relName=>$relDef){
 			if(! empty($relDef['linkTable']) ){ #- save object that use a link table at the very end
 				if( isset($this->_manyModels[$relName]) )
 					$linked[$relName] = $relDef;
@@ -2661,7 +2768,7 @@ abstract class abstractModel{
 			switch($relDef['relType']){
 				case 'dependOn': #- we dependOn that one so must save it first
 					if(! isset($this->_manyModels[$relName]) )
-						throw new Exception(get_calss($this)."::save() require at least one $relName to be set.");
+						throw new RuntimeException(get_calss($this)."::save() require at least one $relName to be set.");
 					$this->getRelated($relName)->save();
 					break;
 				case 'ignored': #- ignored are saved if after with requiredBy
@@ -2673,25 +2780,25 @@ abstract class abstractModel{
 			}
 		}
 		$wasTemporary = $this->isTemporary();
+		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
+		$tableName = self::_getModelStaticProp($this,'tableName');
 		if( $needSave > 0){
 			$datas = $this->datas;
 			$PK = $this->PK;
-			$primaryKey = self::_getModelStaticProp($this,'primaryKey');
-			$tableName = self::_getModelStaticProp($this,'tableName');
 			unset($datas[$primaryKey]); # update all but primaryKey
 			if(! $wasTemporary ){ # update
 				if( false === $this->dbAdapter->update($tableName,$datas,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$PK)) )
-					throw new Exception(get_class($this)." Error while updating (PK=$PK).");
+					throw new ErrorException(get_class($this)." Error while updating (PK=$PK).");
 			}else{ # insert
 				# check for user define primaryKey generation
 				if(! $this->_methodExists('_newPrimaryKey') ){ # database manage key generation (autoincrement)
 					$this->datas[$primaryKey] = $this->dbAdapter->insert($tableName,$datas);
 					if( $this->datas[$primaryKey] === false )
-						throw new Exception(get_class($this)." Error while saving (PK=$PK).");
+						throw new ErrorException(get_class($this)." Error while saving (PK=$PK).");
 				}else{ # user define key generation
 					$datas[$primaryKey] = $nPK = $this->_newPrimaryKey();
 					if( $this->dbAdapter->insert($tableName,$datas,false) === false )
-						throw new Exception(get_class($this)." Error while saving (PK=$nPK).");
+						throw new ErrorException(get_class($this)." Error while saving (PK=$nPK).");
 					$this->datas[$primaryKey] = $nPK;
 				}
 				#- reset temporary instance Key
@@ -2701,6 +2808,27 @@ abstract class abstractModel{
 
 		#- then save models that weren't saved
 		foreach($waitForSave as $relName){
+			if( ! $wasTemporary ){
+				$this->getRelated($relName)->save();
+				continue;
+			}
+			#- attempt to set reverse relation where it make sense
+			#- we must tell related that they've a back relation (if it exists)
+			if( isset($oneRelDefs[$relName]) ){
+				$lclFld  = isset($oneRelDefs[$relName]['localField'])?$oneRelDefs[$relName]['localField']:null;
+				$frgnFld = isset($oneRelDefs[$relName]['foreignField'])?$oneRelDefs[$relName]['foreignField']:null;
+				// if no localField or localField is PK and fwe point to a field in the related table we suppose that we have to set the new primaryKey in this foreignField
+				if( (empty($lclFld) || $lclFld===$primaryKey) && (!empty($frgnFld) && $frgnFld!==self::_getModelStaticProp($oneRelDefs[$relName]['modelName'],'primaryKey')) ){
+					$this->getRelated($relName)->_setData($frgnFld,$this->PK);
+				}
+			}else if(isset($manyRelDefs[$relName]) ){
+				$lclFld  = isset($manyRelDefs[$relName]['localField'])?$manyRelDefs[$relName]['localField']:null;
+				$frgnFld = isset($manyRelDefs[$relName]['foreignField'])?$manyRelDefs[$relName]['foreignField']:null;
+				// if no localField or localField is PK and fwe point to a field in the related table we suppose that we have to set the new primaryKey in this foreignField
+				if( (empty($lclFld) || $lclFld===$primaryKey) && (!empty($frgnFld) && $frgnFld!==self::_getModelStaticProp($manyRelDefs[$relName]['modelName'],'primaryKey')) ){
+					$this->getRelated($relName)->_setData($frgnFld,$this->PK);
+				}
+			}
 			$this->getRelated($relName)->save();
 		}
 		#- the linked part may certainly be optimized for better performance but this should work for now
@@ -2734,11 +2862,11 @@ abstract class abstractModel{
 	*/
 	public function delete(){
 		if($this->deleted)
-			throw new Exception(get_class($this)."::delete($this->PK) model already deleted");
+			throw new RuntimeException(get_class($this)."::delete($this->PK) model already deleted");
 		$needSave = $this->needSave;
-		if($needSave < 0)
+		if($needSave < 0) //- already performing deletion
 			return $this;
-		if( $needSave > 0 && $this->_methodExists('onBeforeDelete') ){
+		if( $this->_methodExists('onBeforeDelete') ){
 			$res = $this->onBeforeDelete();
 			if( true === $res )
 				return;
@@ -2797,8 +2925,8 @@ abstract class abstractModel{
 		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
 		$res = $this->dbAdapter->delete($tableName,array('WHERE '.$this->dbAdapter->protect_field_names($primaryKey).'=?',$this->PK));
 		if($res===false)
-			throw new Exception(get_class($this)."::delete() Error while deleting.");
-		if( $needSave > 0 && $this->_methodExists('onAfterDelete') ){
+			throw new ErrorException(get_class($this)."::delete() Error while deleting.");
+		if( $this->_methodExists('onAfterDelete') ){
 			$this->onAfterDelete();
 		}
 		$this->deleted = true;
