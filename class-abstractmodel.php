@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2010-11-24 - don't override null values in setModelDatasTypes()
 * - 2010-09-27 - attempt in abstractmodel::save to set reverse relation on newly saved models
 * - 2010-09-17 - on[before|after]save now called even if needSave < 1
 *              - add some more fieldName protection
@@ -2417,6 +2418,8 @@ abstract class abstractModel{
 		$primaryKey = self::_getModelStaticProp($this,'primaryKey');
 		foreach($datasDefs as $k=>$v){
 			if( $k===$primaryKey && $this->isTemporary() )
+				continue;
+			if( $this->datas[$k] === null )
 				continue;
 			self::_setType($this->datas[$k],$datasDefs[$k]['Type']);
 		}
