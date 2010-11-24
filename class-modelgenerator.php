@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2010-11-24 - correctly define default null values inside models::$datasDefs
 *            - 2010-09-13 - make $_has[One|Many] static property of extended models public as a workaround for buggy get_class_vars scope resolution
 *            - 2009-06-25 - better detection of ignored relationship on fields NO NULL with NULL as default
 *            - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
@@ -283,7 +284,7 @@ class modelGenerator{
 				$f['Default'] = 0;
 
 			$datas[]       = "'$f[Field]' => '$f[Default]', // $f[Type];";
-			$datasTypes[]  = "'$f[Field]' => array('Type'=>'".str_replace("'","\'",$f['Type'])."', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>'$f[Default]'),";
+			$datasTypes[]  = "'$f[Field]' => array('Type'=>'".str_replace("'","\'",$f['Type'])."', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>".(($f['Default']===null && strtoupper($f['Null'])==='YES')?'null':"'$f[Default]'")."),";
 			if( preg_match('!^\s*ENUM\s*\((.*)\)\s*$!i',$f['Type'],$m)){
 				$vals = $m[1];
 				$methods[] = "
