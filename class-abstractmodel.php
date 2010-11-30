@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 * - 2010-11-24 - don't override null values in setModelDatasTypes()
+* - 2010-10-20 - make abstractModel::$dbConnectionDescriptor a static variable of BASE_ models and add a method _setDbConnectionDescriptor to BASE_models
 * - 2010-09-27 - attempt in abstractmodel::save to set reverse relation on newly saved models
 * - 2010-09-17 - on[before|after]save now called even if needSave < 1
 *              - add some more fieldName protection
@@ -1328,7 +1329,7 @@ abstract class abstractModel{
 	* each model has it's own pointer to the database
 	*/
 	protected $dbAdapter = null;
-	protected $dbConnectionDescriptor = null;
+	static protected $dbConnectionDescriptor = null;
 
 	/** used to know if save is required(1) or in progress(-1) */
 	protected $needSave = 0;
@@ -1420,7 +1421,7 @@ abstract class abstractModel{
 		#- first set internalDatas
 		self::_initInternals(get_class($this));
 		#- link dbAdapter instance
-		$this->dbAdapter = db::getInstance($this->dbConnectionDescriptor);
+		$this->dbAdapter = db::getInstance(self::_getModelStaticProp($this,'dbConnectionDescriptor'));
 		if( self::$useDbProfiler )
 			$this->dbAdapter = new dbProfiler($this->dbAdapter);
 		#- dummy instances do nothing more and return
@@ -2582,11 +2583,11 @@ abstract class abstractModel{
 		$args = array_slice($args,2);
 		return call_user_func_array("$modelName::$method",$args);
 	}
-	#- @todo passer dbadapter en static (ou au moins connectionStr)
 	static public function getModelDbAdapter($modelName){
 		if($modelName instanceof abstractModel)
 			return $modelName->dbAdapter;
-		return  self::getModelDummyInstance($modelName)->dbAdapter;
+		$db = db::getInstance(self::_getModelStaticProp($modelName,'dbConnectionDescriptor'));
+		return self::$useDbProfiler? new dbProfiler($db) : $db;
 	}
 	/**
 	* check if modelName has some related models definitions.

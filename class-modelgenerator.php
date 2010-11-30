@@ -12,29 +12,29 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
-*            - 2010-11-24 - correctly define default null values inside models::$datasDefs
-*            - 2010-09-13 - make $_has[One|Many] static property of extended models public as a workaround for buggy get_class_vars scope resolution
-*            - 2009-06-25 - better detection of ignored relationship on fields NO NULL with NULL as default
-*            - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
-*            - 2009-04-01 - $_avoidEmptyPK is now true by default
-*            - 2009-03-30 - add support for prefixed tables by adding new static properties $tablePrefixes and $excludePrefixedTables
-*            - 2009-02-09 - add new BASE_models static methods _GetSupportedAddons _SupportsAddon
-*                         - add $_avoidEmptyPK property to final models
-*            - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys
-*            - 2008-09-04 - add extended modelCollection
-*            - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
-*            - 2008-08-13 - add method proposition to access enum fields possible values
-*            - 2008-08-05 - add empty property __toString for model rendering as string
-*            - 2008-08-04 - add additional methods proposition for filtering enums fields
-*            - 2008-05-08 - add modelAddons property to final class
-*            - 2008-03-30 - separation of generator and the rest of code
-*                         - now generator conform to new relation definition as hasOne / hasMany
-*                           instead of one2one / one2many / many2many
-*                         - remove withRel parameter
-*            - 2008-03-23 - better model generation :
-*                           * support autoMapping
-*                           * can overwrite / append / or skip existing models
-*                           * can set a constant as dbConnectionStr
+* - 2010-11-24 - correctly define default null values inside models::$datasDefs
+* - 2010-09-13 - make $_has[One|Many] static property of extended models public as a workaround for buggy get_class_vars scope resolution
+* - 2009-06-25 - better detection of ignored relationship on fields NO NULL with NULL as default
+* - 2009-06-03 - split proposed methods to make between BASE and extended models (only filters are proposed in extended)
+* - 2009-04-01 - $_avoidEmptyPK is now true by default
+* - 2009-03-30 - add support for prefixed tables by adding new static properties $tablePrefixes and $excludePrefixedTables
+* - 2009-02-09 - add new BASE_models static methods _GetSupportedAddons _SupportsAddon
+*              - add $_avoidEmptyPK property to final models
+* - 2008-12-19 - add proposed methods filterFieldName and checkFieldNameExists for datas defined with UNIQUE keys
+* - 2008-09-04 - add extended modelCollection
+* - 2008-08-27 - new method BASE_modelName::getFilteredInstance();
+* - 2008-08-13 - add method proposition to access enum fields possible values
+* - 2008-08-05 - add empty property __toString for model rendering as string
+* - 2008-08-04 - add additional methods proposition for filtering enums fields
+* - 2008-05-08 - add modelAddons property to final class
+* - 2008-03-30 - separation of generator and the rest of code
+*              - now generator conform to new relation definition as hasOne / hasMany
+*                instead of one2one / one2many / many2many
+*              - remove withRel parameter
+* - 2008-03-23 - better model generation :
+*                * support autoMapping
+*                * can overwrite / append / or skip existing models
+*                * can set a constant as dbConnectionStr
 * @code
 * // instanctiate a generator
 * $g = new modelGenerator('mysqldb://test;localhost;root;','models');
@@ -377,7 +377,7 @@ class BASE_$modelName extends abstractModel{
 	);
 
 	/** database link */
-	protected \$dbConnectionDescriptor = $dbConnectionDefined;
+	static protected \$dbConnectionDescriptor = $dbConnectionDefined;
 	protected \$dbAdapter = null;
 
 	static protected \$modelName = 'BASE_$modelName';
@@ -453,6 +453,12 @@ class BASE_$modelName extends abstractModel{
 	*/
 	static public function _getStatic(\$propName){
 		return abstractModel::_getModelStaticProp('$modelName',\$propName);
+	}
+	static public function _setDbConnectionDescriptor(\$descriptor,\$detach=false){
+		self::\$dbConnectionDescriptor = \$descriptor;
+		if( \$detach){
+			abstractModel::getModelLivingInstances('$modelName')->detach();
+		}
 	}
 	static public function _getDbAdapter(){
 		return abstractModel::getModelDbAdapter('$modelName');
