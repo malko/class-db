@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2010-12-15 - new parameter optGroup for modelCollecion::htmlOption() method ( by adrien gibrat < adrien dot gibrat at gmail dot com )
+* - 2010-12-13 - add modelCollection::hasModel and abstractModel::inCollection methods
 * - 2010-11-24 - don't override null values in setModelDatasTypes()
 * - 2010-10-20 - make abstractModel::$dbConnectionDescriptor a static variable of BASE_ models and add a method _setDbConnectionDescriptor to BASE_models
 * - 2010-09-27 - attempt in abstractmodel::save to set reverse relation on newly saved models
@@ -233,14 +235,14 @@ abstract class modelAddon{
 */
 class modelCollectionIterator extends arrayIterator{
 	public $modelCollection=null;
-	function __construct($modelCollection){
+	public function __construct($modelCollection){
 		$this->modelCollection = $modelCollection;
 		parent::__construct($modelCollection);
 	}
-	function offsetGet($i){
+	public function offsetGet($i){
 		return $this->modelCollection->offsetGet($i);
 	}
-	function current(){
+	public function current(){
 		return $this->modelCollection->offsetGet($this->key());
 	}
 }
@@ -307,7 +309,7 @@ class modelCollection extends arrayObject{
 			return new modelCollection('abstractModel',$modelList);
 	}
 
-	function getIterator(){
+	public function getIterator(){
 		return new modelCollectionIterator($this);
 	}
 
@@ -316,7 +318,7 @@ class modelCollection extends arrayObject{
 	* @param mixed value abstractModel or modelCollection to append to the current modelCollection
 	* @return $this for method chaining
 	*/
-	function append($value){
+	public function append($value){
 		if( $value instanceof modelCollection && $value->collectionType === $this->collectionType){
 			foreach($value->keys() as $i){
 				$this[] = $i;
@@ -333,7 +335,7 @@ class modelCollection extends arrayObject{
 	* create a new abstractModel matching $this->collectionType and append it to the collection
 	* @return new abstractModel
 	*/
-	function appendNew(){
+	public function appendNew(){
 		$m = abstractModel::getModelInstance($this->collectionType);
 		$this->append($m);
 		return $m;
@@ -347,7 +349,7 @@ class modelCollection extends arrayObject{
 	* @param  bool $chaining if true then return $this collection instead of removed models collection.
 	* @return modelCollection return a collection of removed nodes or $this if $chaining is true
 	*/
-	function remove($model,$chaining=false){
+	public function remove($model,$chaining=false){
 		if(! count($this))
 			return $chaining?$this:self::init($this->collectionType);
 		if( is_null($model) )
@@ -388,16 +390,30 @@ class modelCollection extends arrayObject{
 	* @param  bool $chaining if true then return $this collection instead of removed models collection.
 	* @return modelCollection return a collection of removed nodes or $this if $chaining is true
 	*/
-	function removeTemporaries($chaining=false){
+	public function removeTemporaries($chaining=false){
 		if(! $this->count() )
 			return $chaining?$this:self::init($this->collectionType);
 		return $this->remove($this->getTemporaries()->keys(),$chaining);
 	}
+
+	/**
+	* check given model is an item of the current collection
+	* @see abstractModel::inCollection()
+	* @param abstractModel $model
+	* @return bool
+	*/
+	public function hasModel(abstractModel $model){
+		if(! $model instanceof $this->collectionType ){
+			throw new InvalidArgumentException( get_class($this).'::hasModel() expect a '.$this->collectionType.' as first arguments');
+		}
+		return isset($this[$model->PK])?true:false;
+	}
+
 	/**
 	* return new modelCollection of temporaries instance living inside current collection.
 	* @return modelCollection
 	*/
-	function getTemporaries(){
+	public function getTemporaries(){
 		if(! $this->count() )
 			return self::init($this->collectionType);
 		$temps = array_keys(array_filter($this->isTemporary()));
@@ -405,7 +421,7 @@ class modelCollection extends arrayObject{
 	}
 
 
-	function offsetSet($index,$value){
+	public function offsetSet($index,$value){
 		if(! $value instanceof $this->collectionType ){
 			if($index===null) #- @todo check that value can be a primaryKey for this type of instance
 				$index = $value;
@@ -422,7 +438,7 @@ class modelCollection extends arrayObject{
 		return parent::offsetSet($index, $value);
 	}
 
-	function offsetGet($index){
+	public function offsetGet($index){
 		$value = parent::offsetGet($index);
 		if( $value instanceof $this->collectionType )
 			return $value;
@@ -440,7 +456,7 @@ class modelCollection extends arrayObject{
 	* @param mixed $collection may be a modelCollection of same modelType or a list of PK for the same model
 	* @return new modelCollection
 	*/
-	function merge($collection){
+	public function merge($collection){
 		if( (! is_array($collection) ) && ! ($collection instanceof modelCollection && $collection->collectionType===$this->collectionType) ){
 			throw new InvalidArgumentException("modelCollection::$this->collectionType invalid merge parameter");
 		}
@@ -454,7 +470,7 @@ class modelCollection extends arrayObject{
 	/**
 	* return keys of collection (normally same as all primaryKeys)
 	*/
-	function keys(){
+	public function keys(){
 		return array_keys($this->getArrayCopy());
 	}
 
@@ -462,7 +478,7 @@ class modelCollection extends arrayObject{
 	* return list of $k properties foreach models in the collection
 	* if $k refer to one/many related model(s) then will return a modelCollection
 	*/
-	function __get($k){
+	public function __get($k){
 		if($k==='collectionType')
 			return $this->collectionType;
 
@@ -550,7 +566,7 @@ class modelCollection extends arrayObject{
 	/**
 	* set all models property in collection at once
 	*/
-	function __set($k,$v){
+	public function __set($k,$v){
 		foreach($this->loadDatas() as $mk=>$m)
 			$m->$k = $v;
 	}
@@ -560,7 +576,7 @@ class modelCollection extends arrayObject{
 	* @param string $propertyName can point on any property even related names.
 	* @return array
 	*/
-	function getPropertyList($propertyName){
+	public function getPropertyList($propertyName){
 		if( $this->count() <1)
 			return array();
 		$hasOne = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
@@ -575,7 +591,7 @@ class modelCollection extends arrayObject{
 	* @param mixed $propertiesNames list of propery to get from
 	* @param string $concatSeparator if $concatSeparator is passed then will implode each model results using given string as separator
 	*/
-	function getPropertiesList($propertiesNames,$concatSeparator=null){
+	public function getPropertiesList($propertiesNames,$concatSeparator=null){
 		if( $this->count() <1)
 			return array();
 		$properties = is_array($propertiesNames)?$propertiesNames:preg_split('![,|;]!',$propertiesNames);
@@ -601,7 +617,7 @@ class modelCollection extends arrayObject{
 	* and return their results as an array indexed by instances primarykeys
 	* @return mixed
 	*/
-	function __call($m,$a){
+	public function __call($m,$a){
 		#- get list methods
 		if( preg_match('!get_?([0-9a-zA-Z_]+?)List$!',$m,$match)){
 			$dataKey = abstractModel::_cleanKey($this->collectionType,'hasOne|hasMany|datas',$match[1]);
@@ -661,13 +677,13 @@ class modelCollection extends arrayObject{
 	}
 
   ###--- INCREMENT / DECREMENT ---###
-	function increment($propertyName,$step=1){
+	public function increment($propertyName,$step=1){
 		$this->loadDatas();
 		foreach($this as $k=>$v)
 			$this[$k]->{$propertyName}+=$step;
 		return $this;
 	}
-	function decrement($propertyName,$step=1){
+	public function decrement($propertyName,$step=1){
 		$this->loadDatas();
 		foreach($this as $k=>$v)
 			$this[$k]->{$propertyName}-=$step;
@@ -681,7 +697,7 @@ class modelCollection extends arrayObject{
 	* @param int    $limit       limit the load to $limit models at a time.
 	* @return $this for method chaining
 	*/
-	function loadDatas($withRelated=null,$limit=0){
+	public function loadDatas($withRelated=null,$limit=0){
 		$copy = $this->getArrayCopy();
 		if(empty($copy))
 			return $this;
@@ -759,32 +775,32 @@ class modelCollection extends arrayObject{
 	}
 
 	/** check the collection is empty */
-	function isEmpty(){
+	public function isEmpty(){
 		return ($this->count()>0)?false:true;
 	}
 	/** return current model in collection @return abstractModel or null */
-	function current(){
+	public function current(){
 		if( count($this) < 1) return null;
 		$m = current($this);
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
 	/** return next model in collection @return abstractModel or null */
-	function next(){
+	public function next(){
 		if( count($this) < 1) return null;
 		$m = next($this);
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
 	/** return prev model in collection @return abstractModel or null */
-	function prev(){
+	public function prev(){
 		if( count($this) < 1) return null;
 		$m = prev($this);
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
 	/** return first model in collection @return abstractModel or null */
-	function first(){
+	public function first(){
 		if( count($this) < 1) return null;
 		$m = reset($this);
 		//$m = current($this->getArrayCopy());
@@ -792,17 +808,17 @@ class modelCollection extends arrayObject{
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
 	/** return last model in collection @return abstractModel or null */
-	function last(){
+	public function last(){
 		if( count($this) < 1) return null;
 		$m = end($this);
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
-	function slice($offset,$length=null){
+	public function slice($offset,$length=null){
 		return modelCollection::init($this->collectionType,array_slice($this->keys(),$offset,$length));
 	}
 
-	function paged($pageId=1,$pageSize=10){
+	public function paged($pageId=1,$pageSize=10){
 		$total = $this->count();
 		if( $total === 0 )
 			return array(self::init($this->collectionType),'',0);
@@ -862,7 +878,7 @@ class modelCollection extends arrayObject{
 	/**
 	* save models inside the collection and reset tmpKey if needed to avoid breaking key integrity
 	*/
-	function save(){
+	public function save(){
 		$reset = array();
 		$copy = $this->getArrayCopy();
 		$oldPks = array_keys($copy);
@@ -885,7 +901,7 @@ class modelCollection extends arrayObject{
 	* @param mixed $PK delete one or multiple at once (null will delete all)
 	* @return $this for method chaining
 	*/
-	function delete($PK=null){
+	public function delete($PK=null){
 		if( null===$PK){
 			$PK = $this->PK;
 		}
@@ -917,7 +933,7 @@ class modelCollection extends arrayObject{
 	*                      - user defined callback function (any callable comparison function (see php::usort() for more info)
 	* @return $this for method chaining
 	*/
-	function sort($sortBy,$sortType=null){
+	public function sort($sortBy,$sortType=null){
 		if( ! $this->count() )
 			return $this;
 		$this->_sortBy   = $sortBy;
@@ -959,7 +975,7 @@ class modelCollection extends arrayObject{
 	* @param str $sortType type of comparison to use can be one of see modelCollection::sort() method for more info
 	* @return $this for method chaining
 	*/
-	function rsort($sortBy,$sortType=null){
+	public function rsort($sortBy,$sortType=null){
 		$this->_sortReversed = true;
 		$this->sort($sortBy,$sortType);
 		$this->_sortReversed = false;
@@ -1201,11 +1217,18 @@ class modelCollection extends arrayObject{
 	* @param mixed  $selected      the model selected or it's PK value
 	*                              can also be a list of PK or a modelCollection
 	* @param mixed  $removedModels modelCollection or list of models PK to exclude from the results
+  * @param string $optGroup      optional property to use as a gouping property (used to create optGroup elements)
 	* @return string html
 	*/
-	public function htmlOptions($labelString,$selected=null,$removedModels=null,$disabledModels=null){
+	public function htmlOptions($labelString,$selected=null,$removedModels=null,$disabledModels=null,$optGroup=null){
 		$opts = array();
-		$this->loadDatas();
+		$isRelated = false;
+		if(null !== $optGroup){
+			$isRelated = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
+			$isRelated = isset($isRelated[$optGroup]);
+		}
+		$this->loadDatas($isRelated ? $optGroup : null);
+		
 		if( $selected instanceof $this->collectionType || $selected instanceof modelCollection)
 			$selected = $selected->PK;
 		#- $removedModels must be an array of instance keys
@@ -1220,6 +1243,7 @@ class modelCollection extends arrayObject{
 		if( $disabledModels instanceof modelCollection )
 			$disabledModels = $disabledModels->PK;
 		$disabledModels = array_flip($disabledModels);
+		$previousOptGroup = false;
 		foreach($this as $item){
 			if( isset($removedModels[$item->PK]) )
 				continue;
@@ -1229,8 +1253,18 @@ class modelCollection extends arrayObject{
 				$_selected = in_array($item->PK,$selected);
 			else
 				$_selected = ($item->PK==$selected)?true:false;
-			$opts[] = "<option value=\"$item->PK\"".($_selected?' selected="selected"':'')
-			.(isset($disabledModels[$item->PK])?' disabled="disabled"':'').">$label</option>";
+			if(null !== $optGroup && !empty($item->{$optGroup}) && $previousOptGroup !== ($isRelated ? $item->{$optGroup}->PK : $item->{$optGroup})) {
+				if(false !== $previousOptGroup)
+					$opts[] = "</optgroup>";
+				$previousOptGroup = $isRelated ? $item->{$optGroup}->PK : $item->{$optGroup};
+				$optlabel = $isRelated ? $item->{$optGroup}->__toString() : $optGroup;
+				$opts[] = "<optgroup label=\"$optlabel\">";
+			}
+			$opts[] = "\t<option value=\"$item->PK\"".($_selected?' selected="selected"':'')
+				.(isset($disabledModels[$item->PK])?' disabled="disabled"':'').">$label</option>";
+		}
+		if(false !== $previousOptGroup){ // close last optgroup (if opened)
+			$opts[] = "</optgroup>\n";
 		}
 		return implode("\n\t",$opts);
 	}
@@ -2123,7 +2157,7 @@ abstract class abstractModel{
 
 	}
 
-	function __isset($k){
+	public function __isset($k){
 		return isset($this->datasDefs[$k]);
 	}
 
@@ -2397,7 +2431,7 @@ abstract class abstractModel{
 	*                                   will leave $this->needSave to its previous state.
 	*
 	*/
-	function _setData($key,$value,$bypassFilters=false,$leaveNeedSaveState=false){
+	public function _setData($key,$value,$bypassFilters=false,$leaveNeedSaveState=false){
 		$filterState = $this->bypassFilters;
 		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
 		if(false !== $leaveNeedSaveState )
@@ -2937,8 +2971,23 @@ abstract class abstractModel{
 		$this->detach();
 	}
 
+	/**
+	* check if model already exists in database or not (in fact check for a temporary primaryKey)
+	* @return bool
+	*/
 	public function isTemporary(){
 		return preg_match('!^abstractModelTmpId!',$this->PK)?true:false;
+	}
+	/*
+	* check whether model is part of the given collection or not
+	* @see modelCollection::hasModel()
+	* @return bool
+	*/
+	public function inCollection(modelCollection $collection){
+		if( ! $this instanceof $collection->collectionType ){
+			throw new InvalidArgumentException(get_class($this).'::inCollection expect '.$this->modelName.'Collection as parameter');
+		}
+		return isset($collection[$this->PK])?true:false;
 	}
 
 	/**
@@ -2993,7 +3042,7 @@ abstract class abstractModel{
 	*                          to display a litteral '%' character please just double it like '%%'
 	* @return string
 	*/
-	function _toString($formatStr=null){
+	public function _toString($formatStr=null){
 		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
