@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-02-21 - no more fatal error when throwing exception in __toString()
 * - 2010-12-15 - new parameter optGroup for modelCollecion::htmlOption() method ( by adrien gibrat < adrien dot gibrat at gmail dot com )
 * - 2010-12-13 - add modelCollection::hasModel and abstractModel::inCollection methods
 * - 2010-11-24 - don't override null values in setModelDatasTypes()
@@ -1228,7 +1229,7 @@ class modelCollection extends arrayObject{
 			$isRelated = isset($isRelated[$optGroup]);
 		}
 		$this->loadDatas($isRelated ? $optGroup : null);
-		
+
 		if( $selected instanceof $this->collectionType || $selected instanceof modelCollection)
 			$selected = $selected->PK;
 		#- $removedModels must be an array of instance keys
@@ -3052,6 +3053,10 @@ abstract class abstractModel{
 	//-- backward compatibility with older versions
 	public function __toString(){
 		$formatStr = func_num_args()?func_get_arg(0):null;
-		return call_user_func(array($this,'_toString'),$formatStr);
+		try{
+			return call_user_func(array($this,'_toString'),$formatStr);
+		}catch(Exception $e){
+			return "Exception thrown in  ".get_class($this)."::__toString(): ".$e->getMessage();
+		}
 	}
 }
