@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2011-02-03 - add named smart params to conds ie: array('WHERE field > paramName?','paramName'=>value);
 *            - 2010-09-28 - change empty sliceAttrs to false instead of '' because of weird extract behaviour on empty strings
 *            - 2010-07-07 - introduce freeResults method
 *            - 2010-05-20 - litle enhancement of trace display in dbProfiler::printReport()
@@ -831,7 +832,8 @@ class db{
 		$conds_str = array_shift($conds);
 		array_unshift($conds,'');
 		$i=0;
-		return preg_replace('!(\d*)\?!e',"\$this->prepare_smart_param('\\1'!==''?\$conds['\\1']:(isset(\$conds[++\$i])?\$conds[\$i]:null),'single')",$conds_str);
+		return preg_replace('!([a-zA-Z_0-9]*)\?!e',"\$this->prepare_smart_param(isset(\$conds[\$k='\\1'!==''?'\\1':++\$i])?\$conds[\$k]:null)",$conds_str);
+		#- return preg_replace('!(\d*)\?!e',"\$this->prepare_smart_param('\\1'!==''?\$conds['\\1']:(isset(\$conds[++\$i])?\$conds[\$i]:null),'single')",$conds_str);
 	}
 
 	/**
