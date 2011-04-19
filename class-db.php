@@ -14,6 +14,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2011-04-19 - small change in db::select_slice method to allow more complex queries (such as GROUP BY) to be counted properly
 *            - 2011-02-03 - add named smart params to conds ie: array('WHERE field > paramName?','paramName'=>value);
 *            - 2010-09-28 - change empty sliceAttrs to false instead of '' because of weird extract behaviour on empty strings
 *            - 2010-07-07 - introduce freeResults method
@@ -566,7 +567,7 @@ class db{
 	*/
 	public function select_slice($table,$fields='*',$conds=null,$pageId=1,$pageNbRows=10,$fullSliceAttrs=null){
 		$conds = $this->process_conds($conds);
-		if(! ($tot = $this->select_value($table,'count(*)',$conds) ) )
+		if(! ($tot = $this->select_value("(SELECT 1 FROM ".$this->array_to_str($table).' '.$this->process_conds($conds)." ) as temporaryTable",'count(*)') ) )
 			return FALSE;
 		$limitStart = (int) $pageNbRows * ($pageId-1);
 		$res = $this->select_rows($table,$fields,$conds." Limit $limitStart,$pageNbRows");
