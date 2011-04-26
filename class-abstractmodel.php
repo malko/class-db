@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-04-27 - some modification in the abstractModel::filterData() method no filterMethods will be prefered over declation in the filters static property
 * - 2011-02-21 - no more fatal error when throwing exception in __toString()
 * - 2010-12-15 - new parameter optGroup for modelCollecion::htmlOption() method ( by adrien gibrat < adrien dot gibrat at gmail dot com )
 * - 2010-12-13 - add modelCollection::hasModel and abstractModel::inCollection methods
@@ -2494,21 +2495,25 @@ abstract class abstractModel{
 	}
 
 	/**
-	* apply filter to datas fields, as set in $this->filters or any user defined method named filterFieldName.
-	* return given filtered value or false if not succeed and then append a filterMsg.
+	* apply filters to datas fields.
+	* First will look for a filterFieldName method wich has to return filtered value or false if not passed.
+	* filterFieldName methods has to call appendFilterMsg() method themselves.
+	* If no filter method is found then will look in the static $filters property @see abstractModel::$filters
+	* and if found then will return given filtered value or false if not succeed and then append a filterMsg.
+	* The second way is not recommanded anymore and may be dropped in future version and replaced by the filtersModelAddon.
 	* @param string $k the field to be set
-	* @param string $v the value to be set
+	* @param mixed  $v the value to be set
 	* @return mixed or false in case of error.
 	*/
 	public function filterData($k,$v){
+		// if a filterField method exists we use it
+		if( $this->_methodExists("filter$k",false,true) ){
+			return $this->{"filter$k"}($v);
+		}
+		//-- try old way fashioned filters property 
 		$filters = self::_getModelStaticProp($this,'filters');
-		#- if no filters define check for a filterField method or simply return value
+		#- if no filtering methods was found at all then just return value
 		if( empty($filters[$k]) ){
-			$filterName = "filter$k";
-			#- first look inside model for a filterMethod
-			if( $this->_methodExists($filterName,false,true) )
-				return $this->{$filterName}($v);
-			#- if no filtering methods was found at all then just return value
 			return $v;
 		}
 		#- if we go there we have a $this->filter defined for this field so apply it
