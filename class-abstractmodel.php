@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 * - 2011-04-27 - some modification in the abstractModel::filterData() method no filterMethods will be prefered over declation in the filters static property
+* - 2011-04-21 - new modelCollection static property $getIteratorLoadDatas which set to true will ensure a call to loadDatas automaticly when iterating (using foreach for ex) over a collection
 * - 2011-02-21 - no more fatal error when throwing exception in __toString()
 * - 2010-12-15 - new parameter optGroup for modelCollecion::htmlOption() method ( by adrien gibrat < adrien dot gibrat at gmail dot com )
 * - 2010-12-13 - add modelCollection::hasModel and abstractModel::inCollection methods
@@ -181,6 +182,7 @@ require_once(dirname(__file__).'/class-db.php');
 /**
 * abstract class to ease modelAddons coding
 * @class modelAddon
+* @method _initModelType()
 */
 abstract class modelAddon{
 	protected $modelInstance = null;
@@ -260,6 +262,7 @@ class modelCollection extends arrayObject{
 	private $_sortType     = null;
 	private $_sortReversed = false;
 	private $_datasKeyExp  = '';
+	static public $getIteratorLoadDatas = true;
 
 	/**
 	* Don't use this method anymore, use modelCollection::init() instead.
@@ -312,6 +315,9 @@ class modelCollection extends arrayObject{
 	}
 
 	public function getIterator(){
+		if( self::$getIteratorLoadDatas ){
+			$this->loadDatas();
+		}
 		return new modelCollectionIterator($this);
 	}
 
@@ -757,7 +763,7 @@ class modelCollection extends arrayObject{
 						$relToLoad = abstractModel::_makeModelStaticCall(
 							$hasOnes[$key]['modelName'],
 							'getFilteredInstances',
-							array('WHERE '.abstractModels::getModelDbAdapter($hasOnes[$key]['modelName'])->protect_field_names($hasOnes[$key]['foreignField']).' IN (?)',array_keys($relNotLoaded))
+							array('WHERE '.abstractModel::getModelDbAdapter($hasOnes[$key]['modelName'])->protect_field_names($hasOnes[$key]['foreignField']).' IN (?)',array_keys($relNotLoaded))
 						)->loadDatas()->datas;
 						//show($this,$relNotLoaded,'trace;exit');
 						foreach($relToLoad as $rel){
