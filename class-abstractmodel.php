@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-05-19 - _getRelated on hasOne relation with foreign field will automaticly set the reverse relation
 * - 2011-04-27 - some modification in the abstractModel::filterData() method no filterMethods will be prefered over declation in the filters static property
 * - 2011-04-21 - new modelCollection static property $getIteratorLoadDatas which set to true will ensure a call to loadDatas automaticly when iterating (using foreach for ex) over a collection
 * - 2011-02-21 - no more fatal error when throwing exception in __toString()
@@ -1918,8 +1919,13 @@ abstract class abstractModel{
 			}else{ # foreignKey is primaryKey
 				$tmpModel = self::getModelInstance($relDef['modelName'],$localFieldVal);
 			}
-			if(! $tmpModel instanceof abstractModel) # no related object was found in database create a new one
+			if(! $tmpModel instanceof abstractModel){ # no related object was found in database create a new one
 				$tmpModel = self::getModelInstance($relDef['modelName']);
+				#-- set reverted relation
+				if( (! empty($relDef['foreignField'])) && $relDef['foreignField'] !== self::_getModelStaticProp($relDef['modelName'],'primaryKey') ){
+					$tmpModel->_setData($relDef['foreignField'],$this,true,true);
+				}
+			}
 			return $this->_oneModels[$relName] = $tmpModel;
 		}
 
@@ -2516,7 +2522,7 @@ abstract class abstractModel{
 		if( $this->_methodExists("filter$k",false,true) ){
 			return $this->{"filter$k"}($v);
 		}
-		//-- try old way fashioned filters property 
+		//-- try old way fashioned filters property
 		$filters = self::_getModelStaticProp($this,'filters');
 		#- if no filtering methods was found at all then just return value
 		if( empty($filters[$k]) ){

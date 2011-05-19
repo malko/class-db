@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-05-13 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
 * - 2011-04-01 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
 * - 2011-03-31 - add some docBloc documentation for hasOnes/hasManys properties in generated models
 * - 2010-11-24 - correctly define default null values inside models::$datasDefs
@@ -316,18 +317,24 @@ class modelGenerator{
 	*/
 	static public function check".$ucFirst."Exists(\$v,\$returnInstance=false,\$ignoredPK=null){
 		return self::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v, \$returnInstance, \$ignoredPK);
-	}";
+	}
+	";
 				$methods[]="
 	/**
 	* proposed filter to avoid setting an already existing values to a unique field.
 	*/
 	public function filter".$ucFirst."(\$val){
-		\$exists = $modelName::check".$ucFirst."Exists(\$val,false,\$this->isTemporary()?null:\$this->PK);
-		if( \$exists ){
+		if( \$this->isUnique$ucFirst() ){
 			\$this->appendFilterMsg(\"can't set $f[Field] to an already used value: \$val\");
 			return false;
 		}
 		return \$val;
+	}
+	/**
+	* check if the $f[Field] value is unique or already exists in database
+	*/
+	public function isUnique$ucFirst(\$v=null){
+		return abstractModel::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v===null?\$this->$f[Field]:\$v, false, \$this->isTemporary()?null:\$this->PK);
 	}
 				";
 			}
