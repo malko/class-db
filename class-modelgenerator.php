@@ -3,6 +3,7 @@
 * @package class-db
 * @subpackage abstractModel
 * @author Jonathan Gotti <jgotti at jgotti dot org>
+* @author Adrien Gibrat <adrien.gibrat at gmail dot com>
 * @license http://opensource.org/licenses/lgpl-license.php GNU Lesser General Public License
 * @since 2007-10
 * @class modelGenerator
