@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-06-30 - add missing hasMany support to abstractmodel::__set
+*              - add missing support for user define hasMany setter -> set[HasMany]()
+*              - add missing default getter for hasOne/hasMany
 * - 2011-05-19 - _getRelated on hasOne relation with foreign field will automaticly set the reverse relation
 * - 2011-04-27 - some modification in the abstractModel::filterData() method no filterMethods will be prefered over declation in the filters static property
 * - 2011-04-21 - new modelCollection static property $getIteratorLoadDatas which set to true will ensure a call to loadDatas automaticly when iterating (using foreach for ex) over a collection
@@ -2141,21 +2144,11 @@ abstract class abstractModel{
 			return $v;
 		}
 
-		#- ~ $hasMany = self::_getModelStaticProp($this,'hasMany');
-		/* Is this a good thing to set a collection at once and if yes reflexion on the fact it must be a collection not an array?
+		$hasMany = self::_getModelStaticProp($this,'hasMany');
 		if(isset($hasMany[$k])){
-			if(! $v instanceof modelCollection){
-				if( is_array($v) ){
-					$tmpCollection = new modelCollection($hasMany[$k]['modelName'],$v);
-					foreach($v as $m)
-						$tmpCollection[]=$m;
-					$v = $tmpCollection;
-				}
-			}
-			if(! $v instanceof modelCollection)
-				throw new Exception(get_class($this)." error while trying to set an invalid $k collection.");
-			$this->_manyModels[$k] = $v;
-		}*/
+			$this->{'set'.$k.'Collection'}($v);
+			return $v;
+		}
 
 		if(isset($this->datasDefs[$k])){
 			$v = self::setModelDatasType($this,$k,$v);
@@ -2186,6 +2179,7 @@ abstract class abstractModel{
 	* - getFiltered[_hasManyName|HasManyName]($propertyName,$exp,$comparisonOperator=null) sort of $this->getRelated()->getFilteredBy() trying to be optimized
 	* - get[_dataKey|DataKey]() return the corresponding value in this->datas
 	* - set[_dataKey|DataKey]($value,$bypassFilters=false,$leaveNeedSaveState=false) shortHand for _setData($dataKey,...) return this
+	* - set[_has*Name|Has*Name]($value,$bypassFilters=false,$leaveNeedSaveState=false) shortHand for _setData($dataKey,...) return this
 	* if none of above methods are found then will throw an exception
 	*/
   public function __call($m,$a){
@@ -2335,6 +2329,10 @@ abstract class abstractModel{
 				}
 			}
 			return $this->getRelated($relName);
+		}else if(preg_match('!^set_?('.self::$_internals[$className]['has*KeyExp'].')$!',$m,$match)){
+			array_unshift($a,self::_cleanKey($this,'hasOne|hasMany',$match[1]));
+			call_user_func_array(array($this,'_setData'),$a);
+			return $this;
 		}
 
 		#- manage setter/getter for datas ([gs]et_field|[gs]etField) case sensitive
@@ -2419,10 +2417,8 @@ abstract class abstractModel{
 					$this->datas[$k] = self::setModelDatasType($this,$k,$v);//$v;
 				else
 					$this->{$k} = $v;
-			}elseif( isset($hasOne[$k]) ){
+			}elseif( isset($hasOne[$k]) || isset($hasMany[$k]) ){
 				$this->{$k} = $v;
-			}elseif(isset($hasMany[$k])){
-				$this->{'set'.$k.'Collection'}($v);
 			}elseif( $this->_methodExists('set'.$k,false,true)){
 				$this->{'set'.$k}($v);
 			}
@@ -2447,7 +2443,6 @@ abstract class abstractModel{
 	*/
 	public function _setData($key,$value,$bypassFilters=false,$leaveNeedSaveState=false){
 		$filterState = $this->bypassFilters;
-		$datasDefs = self::_getModelStaticProp($this,'datasDefs');
 		if(false !== $leaveNeedSaveState )
 			$leaveNeedSaveState = $this->needSave;
 		if($bypassFilters)
