@@ -12,6 +12,7 @@
 *            - $HeadURL$
 * @changelog
 * - 2011-07-29 - added shift and pop method to modelCollection
+*              - added prepend() and prependNew methods to modelCollection
 * - 2011-06-30 - add missing hasMany support to abstractmodel::__set
 *              - add missing support for user define hasMany setter -> set[HasMany]()
 *              - add missing default getter for hasOne/hasMany
@@ -351,6 +352,31 @@ class modelCollection extends arrayObject{
 	public function appendNew(){
 		$m = abstractModel::getModelInstance($this->collectionType);
 		$this->append($m);
+		return $m;
+	}
+
+	/**
+	* prepend a single collectionType model instance or a full modelCollection of same collectionType
+	* @param mixed $value abstractModel or modelCollection to append to the current modelCollection
+	* @return $this for method chaining
+	*/
+	public function prepend($value){
+		if( $value instanceof modelCollection && $value->collectionType === $this->collectionType){
+			$this->exchangeArray( $value->getArrayCopy() + $this->getArrayCopy() );
+			return $this;
+		}
+		if(! $value instanceof $this->collectionType)
+			throw new InvalidArgumentException("modelCollection::$this->collectionType can only append $this->collectionType models");
+		$this->exchangeArray(array($value->PK=>$value) + $this->getArrayCopy());
+		return $this;
+	}
+	/**
+	* create a new abstractModel matching $this->collectionType and prepend it to the collection
+	* @return new abstractModel
+	*/
+	public function prependNew($value){
+		$m = abstractModel::getModelInstance($this->collectionType);
+		$this->prepend($m);
 		return $m;
 	}
 
@@ -827,20 +853,23 @@ class modelCollection extends arrayObject{
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
 	}
+	/** like array_slice for collection, return a new modelCollection  */
 	public function slice($offset,$length=null){
 		return modelCollection::init($this->collectionType,array_slice($this->keys(),$offset,$length));
 	}
-  public function shift(){
-    if($model = $this->first()) {
-      $this->remove($model);
-      return $model;
-    }
+	/** remove and return the first modelInstance in the collection */
+	public function shift(){
+		if($model = $this->first()) {
+			$this->remove($model);
+		}
+		return $model;
 	}
+	/** remove and return the last modelInstance in the collection */
 	public function pop(){
-    if($model = $this->last()) {
-      $this->remove($model);
-      return $model;
-    }
+		if($model = $this->last()) {
+			$this->remove($model);
+		}
+		return $model;
 	}
 	public function paged($pageId=1,$pageSize=10){
 		$total = $this->count();
