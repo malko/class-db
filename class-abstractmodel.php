@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-07-29 - added shift and pop method to modelCollection
 * - 2011-06-30 - add missing hasMany support to abstractmodel::__set
 *              - add missing support for user define hasMany setter -> set[HasMany]()
 *              - add missing default getter for hasOne/hasMany
@@ -829,7 +830,18 @@ class modelCollection extends arrayObject{
 	public function slice($offset,$length=null){
 		return modelCollection::init($this->collectionType,array_slice($this->keys(),$offset,$length));
 	}
-
+  public function shift(){
+    if($model = $this->first()) {
+      $this->remove($model);
+      return $model;
+    }
+	}
+	public function pop(){
+    if($model = $this->last()) {
+      $this->remove($model);
+      return $model;
+    }
+	}
 	public function paged($pageId=1,$pageSize=10){
 		$total = $this->count();
 		if( $total === 0 )
