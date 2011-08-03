@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-08-03 - modelCollection::remove() bug correction on multiple removal (typo error=)
+* - 2011-08-02 - minimise var name collisions in _toString methods + modelCollection::_toString() now officially support $i as an iterator
 * - 2011-07-29 - added shift and pop method to modelCollection
 *              - added prepend() and prependNew methods to modelCollection
 * - 2011-06-30 - add missing hasMany support to abstractmodel::__set
@@ -407,7 +409,7 @@ class modelCollection extends arrayObject{
 				foreach($model as $m){
 					$tmp = $this->remove($m);
 					if( null !== $tmp)
-						$res[]=$tmp;
+						$ret[]=$tmp;
 				}
 				return $ret;
 			}
@@ -755,7 +757,7 @@ class modelCollection extends arrayObject{
 			if(! $modelLoaded instanceof $this->collectionType){
 				$needLoad[] = $v;
 			}else{
-				if( $modelLoaded->deleted)#- drop deleted models
+				if( $modelLoaded->deleted )#- drop deleted models
 					unset($this[$v]);
 				else
 					$this[$v] = $modelLoaded;
@@ -1323,6 +1325,8 @@ class modelCollection extends arrayObject{
 	}
 
 	/**
+	* Return the collection as a string in the same way as abstractModel::_toString() do, but for modelCollection.
+	* In addition of abstractModel::_toString() it initialize a $i=0 iterator and allow a string separator between models
 	* @param str $formatStr format string as used by abstractModel::__toString() methods.
 	*                       in addition to other format options you can use %model that will be replaced
 	*                       with the default model::$__toString property.
@@ -1334,14 +1338,17 @@ class modelCollection extends arrayObject{
 		$this->loadDatas();
 		$modelFormatStr = abstractModel::_getModelStaticProp($this->collectionType,'__toString');
 		$formatStr = null===$formatStr?$modelFormatStr:preg_replace('!%model(?=\W|$)!',$modelFormatStr,$formatStr);
-		$str = array();$i=0;
-		foreach($this as $m){
-			${'model'.++$i}=$m;
-			$str[]= preg_replace('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','$model'.$i.'->\\1',$formatStr);
+		$__TOSTRINGstr = array();$i=0;
+		foreach($this as $__TOSTRINGm){
+			${'model'.++$i}=$__TOSTRINGm;
+			$__TOSTRINGstr[]= preg_replace('/(?<!%)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','$model'.$i.'->\\1',$formatStr);
 		}
-		$str=implode($separator,$str);
-		$str = preg_replace(array('/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array("\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$str);
-		return eval('return<<<__TOSTRING'."\n$str\n__TOSTRING;\n");
+		$__TOSTRINGstr = implode($separator,$__TOSTRINGstr);
+		$__TOSTRINGstr = preg_replace(array('/(?<!%)%{(.*?)}%(?!%)/s','!%%!'),array("\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$__TOSTRINGstr);
+		// clean up eval context and add an iterator
+		unset($separator,$formatStr,$modelFormatStr);
+		$i=0;
+		return eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
 	}
 	//-- backward compatibility with older versions
 	public function __toString(){
@@ -3100,8 +3107,9 @@ abstract class abstractModel{
 		$format = $formatStr!==null ? $formatStr : self::_getModelStaticProp($this,'__toString');
 		if( empty($format) )
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
-		$string = preg_replace(array('/(?<!%|\\\\)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%|\\\\)%{(.*?)}%(?!%)/s','![\\\\%]%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
-		return eval('return<<<__TOSTRING'."\n$string\n__TOSTRING;\n");
+		$__TOSTRINGstr = preg_replace(array('/(?<!%|\\\\)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%|\\\\)%{(.*?)}%(?!%)/s','![\\\\%]%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
+		unset($format,$formatStr);
+		return eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
 	}
 	//-- backward compatibility with older versions
 	public function __toString(){

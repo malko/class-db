@@ -13,6 +13,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-08-01 - changed proposed model::isUnique() method behaviour to better match is name
 * - 2011-05-13 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
 * - 2011-04-01 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
 * - 2011-03-31 - add some docBloc documentation for hasOnes/hasManys properties in generated models
@@ -325,7 +326,7 @@ class modelGenerator{
 	* proposed filter to avoid setting an already existing values to a unique field.
 	*/
 	public function filter".$ucFirst."(\$val){
-		if( \$this->isUnique$ucFirst() ){
+		if( !\$this->isUnique$ucFirst() ){
 			\$this->appendFilterMsg(\"can't set $f[Field] to an already used value: \$val\");
 			return false;
 		}
@@ -335,7 +336,7 @@ class modelGenerator{
 	* check if the $f[Field] value is unique or already exists in database
 	*/
 	public function isUnique$ucFirst(\$v=null){
-		return abstractModel::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v===null?\$this->$f[Field]:\$v, false, \$this->isTemporary()?null:\$this->PK);
+		return !abstractModel::modelCheckFieldDatasExists('$modelName', '$f[Field]', \$v===null?\$this->$f[Field]:\$v, false, \$this->isTemporary()?null:\$this->PK);
 	}
 				";
 			}
