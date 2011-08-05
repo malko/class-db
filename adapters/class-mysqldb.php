@@ -12,6 +12,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+*            - 2011-08-05 - make usage of protect_field_names() in optimize(),list_table_fields(),show_table_keys()
 *            - 2010-07-07 - introduce freeRestults method
 *            - 2010-02-22 - now error on select_db at open/check_connection('active') time will return false
 *            - 2008-05-12 - add parameter $setNames to select_db() that will default to new static property
@@ -251,7 +252,7 @@ class mysqldb extends db{
 	* @return array
 	*/
 	function list_table_fields($table,$extended_info=FALSE){
-		if(! $res = $this->query_to_array("SHOW FIELDS FROM $table"))
+		if(! $res = $this->query_to_array("SHOW FIELDS FROM ".$this->protect_field_names($table)))
 			return FALSE;
 		if($extended_info)
 			return $res;
@@ -263,7 +264,7 @@ class mysqldb extends db{
 
 	/** Verifier si cette methode peut s'appliquer a SQLite */
 	function show_table_keys($table){
-		return $this->query_to_array("SHOW KEYS FROM $table");
+		return $this->query_to_array("SHOW KEYS FROM ".$this->protect_field_names($table));
 	}
 	/**
 	* optimize table statement query
@@ -271,7 +272,7 @@ class mysqldb extends db{
 	* @return bool
 	*/
 	function optimize($table){
-		return $this->query("OPTIMIZE TABLE $table");
+		return $this->query("OPTIMIZE TABLE ".$this->protect_field_names($table));
 	}
 	function error_no(){
 		return $this->conn?mysql_errno($this->conn):FALSE;
