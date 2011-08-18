@@ -13,6 +13,10 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-08-16 - datas arrays now is properly typed in BASE_models
+* - 2011-08-11 - allow user to change the method to determine single form of table names by adding a modelgenerator::$singularizer property
+*              - add modelgenerator::$forceHasOneSingular property that will take the first single form returned by singularizer for hasOne property
+*                /!\ IMPORTANT /!\ be aware that if you regenerate model from previous modelGenerator version you probably should set modelgenerator::$forceHasOneSingular to false
 * - 2011-08-01 - changed proposed model::isUnique() method behaviour to better match is name
 * - 2011-05-13 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
 * - 2011-04-01 - add some more docBloc documentation for hasOnes/hasManys related methods in generated models
@@ -90,6 +94,14 @@ class modelGenerator{
 	* but setting this to true model generation will then only include talbes that don't match the given prefixes.
   */
 	static public $excludePrefixedTables=false;
+
+	/**
+	* this allow to override the mechanism to detect singular form of a plural name a basic one is setted as default.
+	* the method will receive a single word and has to return an array of possibles values
+	*/
+	static public $singularizer = array('modelGenerator','singular');
+	static public $forceHasOneSingular = true;
+
 	/**
 	* create an instance of modelGenerator.
 	* @param string $dbConenctionStr
@@ -131,8 +143,12 @@ class modelGenerator{
 		}
 
 		#- get singles names
-		foreach($tables as $tb)
-			$singles[$tb] = preg_replace("!(s|x)$!","",$tb);
+		foreach($tables as $tb){
+			$singlesVal = array_filter((array) call_user_func(self::$singularizer,$tb));
+			foreach($singlesVal as $s){
+				$singles[$s] = $tb;
+			}
+		}
 		#- then fields info for each tables
 		foreach($tables as $tb){
 			$tbFields[$tb] = $this->db->list_table_fields($tb,true);
@@ -157,7 +173,10 @@ class modelGenerator{
 					$fName = $fInfos['Field'];
 					$relDflt = false;
 					#- hasOne relations
-					if( ($foreignTb = array_search($fName,$singles))){
+					#- if( ($foreignTb = array_search($fName,$singles))){
+					$foreignTb = false;
+					if( !empty($singles[$fName]) ){
+						$foreignTb = $singles[$fName];
 						if(! empty($tbFields[$foreignTb]['PK'] ) ){
 							$hasOne=array(
 								'modelName'=>$foreignTb,
@@ -196,7 +215,7 @@ class modelGenerator{
 					}
 
 					#- if we've found a hasOne map the corresponding hasOne or hasMany
-					if( $foreignTb && !empty($tbFields[$tb]['PK']) ){
+					if( !empty($foreignTb) && !empty($tbFields[$tb]['PK']) ){
 						if($fInfos['Key'] === 'UNI' || $fInfos['Key'] === 'PRI'){
 							$tbFields[$foreignTb]['hasOne'][$tb] = array(
 								'modelName'   =>$tb,
@@ -282,14 +301,21 @@ class modelGenerator{
 			$dbConnectionDefined = "'$this->connectionStr'";
 
 		#- prepare the datas array
-		foreach( $modelDesc as $k=>$f){
+		foreach( $modelDesc as $k=>$f ){
 			if( in_array($k,array('PK','hasMany','hasOne'),true))
 				continue;
 			if( strrpos($f['Key'],'PRI')===0 && $f['Default'] === null )
 				$f['Default'] = 0;
+			if( $f['Default']===null && strtoupper($f['Null'])==='YES' ){
+				$dflt = 'null';
+			}elseif( preg_match('!^\s*((tiny|big|medium|small)?int|timestamp|float|real|double|decimal)!i',$f['Type']) ){
+				$dflt = empty($f['Default'])?0:$f['Default'];
+			}else{
+				$dflt = "'$f[Default]'";
+			}
 
-			$datas[]       = "'$f[Field]' => '$f[Default]', // $f[Type];";
-			$datasTypes[]  = "'$f[Field]' => array('Type'=>'".str_replace("'","\'",$f['Type'])."', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>".(($f['Default']===null && strtoupper($f['Null'])==='YES')?'null':"'$f[Default]'")."),";
+			$datas[]       = "'$f[Field]' => $dflt, //$f[Type]";
+			$datasTypes[]  = "'$f[Field]' => array('Type'=>'".str_replace("'","\'",$f['Type'])."', 'Extra'=>'$f[Extra]', 'Null' =>'$f[Null]', 'Key' =>'$f[Key]', 'Default'=>$dflt),";
 			if( preg_match('!^\s*ENUM\s*\((.*)\)\s*$!i',$f['Type'],$m)){
 				$vals = $m[1];
 				$methods[] = "
@@ -347,12 +373,18 @@ class modelGenerator{
 		if(! empty($modelDesc['hasOne']) ){
 			foreach($modelDesc['hasOne'] as $relName=>$hasOne){
 				$oneStr = '';
+				if( self::$forceHasOneSingular ){
+					$single = array_filter((array) call_user_func(self::$singularizer,$relName));
+					if( $single = array_shift($single) ){
+						$relName = $single;
+					}
+				}
 				foreach($hasOne as $k=>$v){
 					$oneStr .= "\n\t\t\t'$k'=>".($v===null?'null':"'".($k==='modelName'?self::__prefix($v,$prefix):$v)."'").",";
 				}
 				$hasOnes[] = "'$relName' => array($oneStr\n\t\t),";
 				$classDocBloc[] = "@property $hasOne[modelName] \$$relName";
-				$classDocBloc[] = "@method $hasOne[modelName] get".ucfirst($hasOne['modelName'])."()";
+				$classDocBloc[] = "@method $hasOne[modelName] get".ucfirst($relName)."()";
 			}
 		}
 		#- ~ prepare hasMany
@@ -573,6 +605,15 @@ class ".$modelName."Collection extends modelCollection{
 			$name=preg_replace('!^('.self::$tablePrefixes.')!','',$name);
 		}
 		return $prefix.(preg_match('![a-z]$!i',$prefix)?ucFirst($name):$name);
+	}
+
+	static public function singular($plural){
+		$res = array();
+		if( preg_match("!ies$!",$plural))
+			$res[] = substr($plural,0,-3).'y';
+		if( preg_match("!(s|x)$!",$plural) )
+			$res[] = substr($plural,0,-1);
+		return $res;
 	}
 
 }

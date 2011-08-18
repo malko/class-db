@@ -11,6 +11,9 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-08-17 - new modelCollection::unique() method
+*              - new modelCollection::getIndexedBy() method
+*              - suppress changelog comments older than 2009
 * - 2011-08-03 - modelCollection::remove() bug correction on multiple removal (typo error=)
 * - 2011-08-02 - minimise var name collisions in _toString methods + modelCollection::_toString() now officially support $i as an iterator
 * - 2011-07-29 - added shift and pop method to modelCollection
@@ -96,94 +99,11 @@
 *              - add abstractModel::__get() accessors to 'dfltFiltersDictionary','modelAddons','__toString','_avoidEmptyPK' static properties
 *              - modelCollection::__get() now check $_avoidEmptyPK when accessing models properties
 *              - new modelCollection methods getTemporaries() and removeTemporaries()
-* - 2008-12-19 - new abstractModel::modelCheckFieldDatasExists()
-* - 2008-12-03 - bug correction in abstractController::append[_?hasMany]()
-*              - now user defined setters are not called when bypassFilters is on (this is to avoid passing in user setter when loading collection datas)
-* - 2008-11-28 - bug correction in int type detection
-*              - new abstractModel::_getProperties() method and new parameter $concatSeparator for modelCollection::getPropertiesList()
-* - 2008-11-27 - little modification in type detection
-*              - new modelCollection::min[_?FieldName]([FieldName]) modelCollection::max[_?FieldName]([FieldName]) methods
-* - 2008-11-26 - first attempt to make modelCollection::filterBy() with 'in' || '!in' operator to work with modelCollection as expression
-* - 2008-11-18 - make modelCollection sort methods stable (preserve previous order in case of equality)
-* - 2008-10-07 - bug correction (typo error in getRelated methods)
-* - 2008-09-04 - now abstractModel::__get() will first try to find a user defined getter (ie: get[property])
-*              - now modelCollection::__construct() is protected you must use modelCollection::init() instead to try to get user defined collection class first
-* - 2008-09-01 - new modelCollection::sum() and modelCollection::avg() methods
-*              - modelCollection::__call() now manage (sum|avg)[_]PropertyName() methods
-*              - __toString() now use heredoc syntax to permit only one call to eval by model idem for collections (small optimisation)
-* - 2008-08-29 - new modelCollection::getPropertyList() method
-*              - new modelCollection::getPropertiesList() method
-*              - modelCollection::filterBy() and modelCollection::__get() now use modelCollection::getPropertyList()
-*              - modelCollection::__call() now manage get[_]PropertyNameList() methods
-*              - abstractModel::_cleanKey() now can check multiple keyType at once
-* - 2008-08-28 - modelCollection::filterBy() now work on related objects properties
-* - 2008-08-27 - bug correction in appendFilterMsgs with langManager support.
-*              - modelCollection::__call() now manage map[_]FieldName methods
-*              - new abstractModel::getFilteredModelInstance() method
-* - 2008-08-20 - now modelCollection::filterBy() support in,!in,IN,!IN operators for in_array comparisons
-*              - modelCollection::(in|de)crement() now call modelCollection::loadDatas() first
-*              - now setting model datas values will only change needSave state to 1 if set to a new value;
-* - 2008-08-19 - new modelCollection dynamic methods, filterBy[_]FieldName and [r]sortBy[_]FieldName
-*              - __call now will call each instance methods and return their result as an array if no dynamic method was found
-* - 2008-08-12 - new modelCollection::__toString() method
-*              - add parameter $formatStr to modelCollection::__toString() and abstractModel::__toString() methods to override default format on explicit call
-*              - modelCollection::htmlOptions() now call modelCollection::loadDatas() prior to rendering
-* - 2008-08-06 - modelCollection::htmlOptions() will use default model::__toString() method to render empty labels
-* - 2008-08-05 - add property and method __toString to abstractModel to ease string representation
-* - 2008-07-30 - bug correction in modelCollection::increment/decrement
-* - 2008-07-28 - new method modelAddon::isModelMethodOverloaded to test dynamic methods overloading
-* - 2008-07-25 - add lookup in modelAddons for filtering methods id none found in the model.
-* - 2008-07-23 - modelCollection::htmlOptions() can now take a collection or array as $selected parameter for multiple selection options
-* - 2008-05-22 - add optional orderBy for hasManyDef that will be used at getRelated() time (usefull for related datas that must be sort by date for example)
-*              - setting related hasOne model by primaryKey will now set the correct type in the model datas array
-* - 2008-05-15 - new models method appendNew[HasManyName] that return the new model and link it to current model
-*              - add remove method to modelCollection
-* - 2008-05-08 - add abstractModel static public property $dfltFiltersDictionary to permit filterMsgs to be lookedUp in dictionaries (specific to simpleMVC)
-*              - add sprintf support to appendFilterMsg() method
-* - 2008-05-06 - now modelCollection::loadDatas() reset tmpAbstracModel keys
-*              - modelCollection now implement method to create htmlOptions from models handles in it
-*              - abstractModels can now access some static properties (primaryKey,tableName,modelName) as normal instance properties
-* - 2008-05-05 - rewrite modelCollection::current() and add prev(), next(), first() and last() methods
-*                all returning abtractModel or null
-*              - add new methods support to modelCollection:
-*                - increment/decrement methods (in|de)crementPropertyName($step=1)
-*                - filtering method filterBy($propertyName,$exp,$comparisonOperator)
-*                - mapping method map($callBack,$propertyName=null)
-*                - cloning method clonedCollection()
-*              - add $leaveNeedSaveState to permit to set instances by datas wihtout setting $needSave to 1
-* - 2008-05-04 - add $isDummyInstance internal parameter to abstractModel::__construct
-* - 2008-05-02 - some more methods to set datasTypes now addons can load modelInstance datas.
-* - 2008-04-30 - now _makeModelStaticCall and getModelDbAdapter can take instance of model as first parameter instead of string
-*              - add support for modelAddons
-* - 2008-04-25 - new  sort and rsort methods for modelCollection.
-* - 2008-04-xx - so many changes that i didn't mentioned them as we weren't in any "stable" or even "alpha" release
-*                now that we have a more usable version i will write changes again
-* - 2008-03-31 - add user define onBeforeSave methods to be called before save time. save is aborted if return true
-*              - methods append_relName || appendRelName to add related object to hasMany relations
-*              - methods set_relName_collection || setRelNameCollection to set an entire modelCollection as a hasMany relation
-*              - method save on modelCollection
-*              - don't load unsetted related object at save time
-* - 2008-03-30 - separation of modelGenerator class in its own file
-*              - remove the withRel parameter everywhere (will be replaced with dynamic loading everywhere)
-*              - replace old relational defs (one2*) by hasOne and hasMany defs instead
-* - 2008-03-25 - some change in modelCollection and apparition of modelCollectionIterator.
-*                now models can be setted with only their PK and be retrieved only on demand (dynamic loading)
-* - 2008-03-24 - now you can have user define methods for setting and filtering datas
-*              - new methods filterDatas, appendFiltersMsgs and hasFiltersMsgs (to ease the creation of user define filter methods)
-*              - getFiltersMsgs can now take a parameter to reset messages
-* - 2008-03-23 - better model generation :
-*                * support autoMapping
-*                * can overwrite / append / or skip existing models
-*                * can set a constant as dbConnectionStr
-*              - new class modelCollection that permitt some nice tricks (thanks to SPL)
-* - 2008-03-15 - now can get and add related one2many objects
 * @todo replace all getModel/setModel methods by modelGet/modelSet to avoid collision with dynamicly defined get/set methods
 * @todo add dynamic filter such as findBy_Key_[greater[Equal]Than|less[equal]Than|equalTo|Between]
 *       require php >= 5.3 features such as late static binding and __callstatic() magic method
 *       you will have to satisfy yourself with getFilteredInstances() or getFilteredInstancesByField() methods until that
 * @todo OPTIMISER LES DELETES (notamment sur les collections)!!!!!
-* @todo penser a setter les relations quand on fait un setModelCollection!!!!!
-*       et aussi au moment du save ca serait pas mal!
 */
 
 require_once(dirname(__file__).'/class-db.php');
@@ -633,7 +553,7 @@ class modelCollection extends arrayObject{
 	* @param string $concatSeparator if $concatSeparator is passed then will implode each model results using given string as separator
 	*/
 	public function getPropertiesList($propertiesNames,$concatSeparator=null){
-		if( $this->count() <1)
+		if( $this->count() < 1 )
 			return array();
 		$properties = is_array($propertiesNames)?$propertiesNames:preg_split('![,|;]!',$propertiesNames);
 		$loadDatas = array();
@@ -644,6 +564,46 @@ class modelCollection extends arrayObject{
 		$res = array();
 		foreach($this->loadDatas(empty($loadDatas)?null:implode('|',$loadDatas)) as $mk => $m)
 			$res[$mk] = $m->_getProperties($properties,$concatSeparator);
+		return $res;
+	}
+	/**
+	* return an array of model (or modelCollection if more than one value) indexed by the given porperty.
+	* In case of multiple model matching the same value for the given property then the default is to return a
+	* collection of thoose matching models, you can choose to keep only one of thoose matching models by passing
+	* $forceSingleValue as true (arbitrary determined).
+	* @param string $propertyName     name of the property we whant to use as index
+	* @param bool   $forceSingleValue on multiple matching models for a given property value return only one of thoose.
+	* @param bool   $onlyDatas        if true only datas array property will be returned instead of full models / modelCollections
+	* @return array list of model (or modelCollection) indexed by the given property
+	*/
+	public function getIndexedBy($propertyName,$forceSingleValue=false,$onlyDatas=false){
+		if( $this->count() <1)
+			return array();
+		$hasOne = abstractModel::_getModelStaticProp($this->collectionType,'hasOne');
+		$hasMany = abstractModel::_getModelStaticProp($this->collectionType,'hasMany');
+		$res = array();
+		foreach($this->loadDatas(( isset($hasOne[$propertyName]) || isset($hasMany[$propertyName]) )?$propertyName:null) as $m){
+			$key = $m->$propertyName;
+			if( $key instanceof abstractModel ){
+				$key = $key->PK;
+			}else if ($key instanceof modelCollection){
+				$key = implode($key->PK);
+			}
+			if( ! isset($res[$key]) ){
+				$res[$key] = $m;
+			}elseif( $forceSingleValue ){
+				continue;
+			}elseif( $res[$key] instanceof modelCollection ){
+				$res[$key]->append($m);
+			}else{
+				$res[$key] = modelCollection::init($this->collectionType,array($res[$key],$m));
+			}
+		}
+		if( $onlyDatas ){
+			foreach($res as $k=>$v){
+				$res[$k] = $v->datas;
+			}
+		}
 		return $res;
 	}
 
@@ -755,7 +715,8 @@ class modelCollection extends arrayObject{
 			}
 			$modelLoaded = abstractModel::isLivingModelInstance($this->collectionType,$v,true);
 			if(! $modelLoaded instanceof $this->collectionType){
-				$needLoad[] = $v;
+				if( null !== $v)
+					$needLoad[] = $v;
 			}else{
 				if( $modelLoaded->deleted )#- drop deleted models
 					unset($this[$v]);
@@ -1245,6 +1206,16 @@ class modelCollection extends arrayObject{
 		if( $this->count() < 1)
 			return 0;
 		return $this->clonedCollection()->sort($propertyName)->first()->{$propertyName};
+	}
+
+	/**
+	* return distinct values of given property in the current collection
+	* @param string $propertyName name of the property we want to get distincts values for
+	* @param sort_flags $sortFlag @see array_unique for more info
+	* @return array
+	*/
+	public function unique($propertyName,$sortFlag=null){
+		return null===$sortFlag?array_unique($this->{$propertyName},$sortFlag):array_unique($this->{$propertyName});
 	}
 
 
