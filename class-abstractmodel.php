@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-11-14 - new modelCollection::pos() and modelCollection::seek() methods
 * - 2011-08-17 - new modelCollection::unique() method
 *              - new modelCollection::getIndexedBy() method
 *              - suppress changelog comments older than 2009
@@ -793,6 +794,42 @@ class modelCollection extends arrayObject{
 		$m = next($this);
 		if( false === $m ) return null;
 		return ($m instanceof $this->collectionType )?$m:abstractModel::getModelInstance($this->collectionType,$m);
+	}
+	/**
+	* return 0 based index position in the collection of current cursor position or given model or key
+	* this don't move the internal cursor.
+	* @param mixed $pos abstractModel or key (key are searched in strict mode)
+	* @return int position
+	*/
+	public function pos($pos=null){
+		if( null !== $pos ){
+			if( $pos instanceof abstractModel ){
+				if(! $pos instanceof $this->collectionType){
+					return false;
+				}
+				$pos = $pos->PK;
+			}
+			if( ! isset($this[$pos]) ){
+				return false;
+			}
+			return array_search($pos,$this->keys(),true);
+		}
+		return array_search(key($this),$this->keys());
+	}
+	/**
+	* move cursor position to the given 0 indexed pos
+	* @param int $pos
+	* @return $this
+	*/
+	public function seek($pos){
+		if( ($this->count()-1) < (int) $pos){
+			throw new OutOfBoundsException(get_class($this).'::seek() try to seek to an invalid position');
+		}
+		reset($this);
+		for($i=0;$i<$pos;$i++){
+			next($this);
+		}
+		return $this;
 	}
 	/** return prev model in collection @return abstractModel or null */
 	public function prev(){
