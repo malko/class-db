@@ -11,6 +11,7 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2011-11-15 - new modelCollection::reverse() method
 * - 2011-11-14 - new modelCollection::pos() and modelCollection::seek() methods
 * - 2011-08-17 - new modelCollection::unique() method
 *              - new modelCollection::getIndexedBy() method
@@ -1069,13 +1070,18 @@ class modelCollection extends arrayObject{
 			return $res>0?-1:1;
 		return $res;
 	}
-
 	/**
 	* randomize order of elements in collection
 	* @return modelCollection $this for method chaining
 	*/
 	public function shuffle(){
 		return $this->sortByPK('shuffle');
+	}
+	/**
+	* return a new collection in reversed order of the current one
+	*/
+	public function reverse(){
+		return modelCollection::init($this->collectionType,array_reverse($this->getArrayCopy()));
 	}
 
 	###--- FILTERING METHODS ---###
