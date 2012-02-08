@@ -159,7 +159,7 @@ class sqlitedb extends db{
 	*/
 	function list_table_fields($table,$extended_info=FALSE){
 		# Try the simple method
-		if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
+		if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM ".$this->protect_field_names($table)." LIMIT 0,1")){
 			return array_keys($res[0]);
 		}else{ # There 's no row in this table so we try an alternate method or we want extended infos
 			if(! $fields = $this->query_to_array("SELECT sql FROM sqlite_master WHERE type='table' AND name ='$table'") )

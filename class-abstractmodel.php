@@ -13,6 +13,7 @@
 * @changelog
 * - 2011-11-15 - new modelCollection::reverse() method
 * - 2011-11-14 - new modelCollection::pos() and modelCollection::seek() methods
+* - 2011-10-20 - throw exception on bad _toString parameter
 * - 2011-08-17 - new modelCollection::unique() method
 *              - new modelCollection::getIndexedBy() method
 *              - suppress changelog comments older than 2009
@@ -415,7 +416,7 @@ class modelCollection extends arrayObject{
 		return $model;
 	}
 	/**
-	* append the given collection to the current one.
+	* append the given collection to a copy of the current one.
 	* @param mixed $collection may be a modelCollection of same modelType or a list of PK for the same model
 	* @return new modelCollection
 	*/
@@ -737,9 +738,10 @@ class modelCollection extends arrayObject{
 			$db->freeResults();
 			if( empty($rows) ) #- @todo musn't append so certainly have to throw an exception ??
 				return $this;
-			foreach($rows as $row){
+			foreach($rows as $k=>$row){
 				$PK = $row[$primaryKey];
 				$this[$PK] = abstractModel::getModelInstanceFromDatas($this->collectionType,$row,true,true,true);
+				$rows[$k]=null;
 			}
 			$rows=null;
 		}
@@ -1070,6 +1072,7 @@ class modelCollection extends arrayObject{
 			return $res>0?-1:1;
 		return $res;
 	}
+
 	/**
 	* randomize order of elements in collection
 	* @return modelCollection $this for method chaining
@@ -1362,7 +1365,13 @@ class modelCollection extends arrayObject{
 		// clean up eval context and add an iterator
 		unset($separator,$formatStr,$modelFormatStr);
 		$i=0;
-		return eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
+
+		$__TOSTRINGstr = eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
+		if( false!==$__TOSTRINGstr){
+			return $__TOSTRINGstr;
+		}
+		throw new InvalidArgumentException(get_class($this).'::_toString() called with wrong parameter  \''.func_get_arg(0)."'");
+
 	}
 	//-- backward compatibility with older versions
 	public function __toString(){
@@ -2682,6 +2691,10 @@ abstract class abstractModel{
 		if(empty(self::$_internals[$modelName]))
 			self::_initInternals($modelName);
 		return eval("return isset($modelName::\$$staticProperty)?$modelName::\$$staticProperty:null;");
+		#- $n = new ReflectionClass($modelName);
+		#- $n = $n->getStaticProperties();
+		#- return isset($n[$staticProperty])?$n[$staticProperty]:null;
+
 	}
 	static public function _makeModelStaticCall($modelName,$method){
 		if( $modelName instanceof abstractModel )
@@ -3123,7 +3136,11 @@ abstract class abstractModel{
 			return "“ instance of model $this->modelName with primaryKey $this->primaryKey=$this->PK ”";
 		$__TOSTRINGstr = preg_replace(array('/(?<!%|\\\\)%(?!%)([A-Za-z_][A-Za-z0-9_]*)/','/(?<!%|\\\\)%{(.*?)}%(?!%)/s','![\\\\%]%!'),array('$this->\\1',"\n__TOSTRING\n.(\\1).<<<__TOSTRING\n",'%'),$format);
 		unset($format,$formatStr);
-		return eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
+		$__TOSTRINGstr = eval('return<<<__TOSTRING'."\n$__TOSTRINGstr\n__TOSTRING;\n");
+		if( false!==$__TOSTRINGstr){
+			return $__TOSTRINGstr;
+		}
+		throw new InvalidArgumentException(get_class($this).'::_toString() called with wrong parameter  \''.func_get_arg(0)."'");
 	}
 	//-- backward compatibility with older versions
 	public function __toString(){

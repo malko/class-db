@@ -347,12 +347,14 @@ class db{
 	}
 
 	function __call($m,$a){
-		if( isset(self::$aliases[$m]) )
+		if( isset(self::$aliases[$m]) ){
 			return call_user_func_array(array($this,self::$aliases[$m]),$a);
+		}
+		throw new BadMethodCallException(get_class($this).'::'.$m.'() method doesn\'t exist.');
 	}
 	###*** REQUIRED METHODS FOR EXTENDED CLASS ***###
 
-	/** open connection to database */
+	/** open connection to database (should return false on error)*/
 	public function open(){}
 
 	/** close connection to previously opened database */
@@ -703,7 +705,7 @@ class db{
 			$fields = array_keys(reset($values));
 			#- cherck there's not only numeric values
 			$_fields = array_filter($fields,'is_int');
-			if( count($_fields) ===count($fields ))
+			if( count($_fields) === count($fields ))
 				$fields = null;
 		}
 		if( null !== $fields)
@@ -841,7 +843,7 @@ class db{
 	* used internally for smart params processing
 	* @private
 	*/
-	protected function prepare_smart_param($val){
+	public function prepare_smart_param($val){
 		if(is_null($val)){
 			return 'NULL';
 		}elseif (is_int($val) || is_float($val)) {

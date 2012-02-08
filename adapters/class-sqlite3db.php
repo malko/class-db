@@ -211,12 +211,12 @@ class sqlite3db extends db{
 	*/
 	function list_table_fields($table,$extended_info=FALSE){
 		# Try the simple method
-		if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM $table LIMIT 0,1")){
+		if( (! $extended_info) && $res = $this->query_to_array("SELECT * FROM ".$this->protect_field_names($table)." LIMIT 0,1")){
 			return array_keys($res[0]);
 		}else{ # There 's no row in this table so we try an alternate method or we want extended infos
-			if(! $fields = $this->query_to_array('PRAGMA table_info('.$table.')') )
+			if(! $fields = $this->query_to_array('PRAGMA table_info('.$this->protect_field_names($table).')') )
 				return false;
-			$indexes = (array) $this->query_to_array('PRAGMA index_list('.$table.')');
+			$indexes = (array) $this->query_to_array('PRAGMA index_list('.$this->protect_field_names($table).')');
 			if(!empty($indexes)){
 				$indexes = $this->associative_array_from_q2a_res('name','unique',$indexes);
 				foreach($indexes as $iname=>$uni){
