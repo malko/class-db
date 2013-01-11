@@ -11,6 +11,8 @@
 *            - $LastChangedBy$
 *            - $HeadURL$
 * @changelog
+* - 2013-01-11 - new modelCollection::hasFiltersMsgs() method
+* - 2012-06-08 - new abstractmodel::hasNonTemporary() method
 * - 2011-11-15 - new modelCollection::reverse() method
 * - 2011-11-14 - new modelCollection::pos() and modelCollection::seek() methods
 * - 2011-10-20 - throw exception on bad _toString parameter
@@ -932,6 +934,25 @@ class modelCollection extends arrayObject{
 		return array($c,$formatStr,$total);
 	}
 	/**
+	* Return boolean if any model in the collection has a filterMsg
+	* it also may return a list of boolean whether each model in the collection has or not filterMsgs indexed by model Primary key
+	* @param Boolean $asArray if true return an array instead of a single boolean
+	* @return boolean or array
+	*/
+	public function hasFiltersMsgs($asArray=false){
+		if( $asArray ){
+			$res = array();
+		}
+		foreach( $this as $PK=>$m){
+			if( $asArray ){
+				$res[$PK] =  $m->hasFiltersMsgs();
+			}else if( $m->hasFiltersMsgs() ){
+				return true;
+			}
+		}
+		return $asArray ? $res : false;
+	}
+	/**
 	* save models inside the collection and reset tmpKey if needed to avoid breaking key integrity
 	*/
 	public function save(){
@@ -977,7 +998,7 @@ class modelCollection extends arrayObject{
 	###--- SORTING METHODS ---###
 	/**
 	* sort collection by given datas property name
-	* @param str $sortBy   property to use to sort the collection
+	* @param str $sortBy   property to use to sort the collection (may also be a user callback for more complex comparisons)
 	* @param str $sortType type of comparison to use can be one of
 	*                      - null (default) will use std, natc or binc depending on property type (as defined in model::datasDefs[property])
 	*                      - std  use standard > or < comparison
@@ -990,11 +1011,19 @@ class modelCollection extends arrayObject{
 	* @return $this for method chaining
 	*/
 	public function sort($sortBy,$sortType=null){
+		if( is_callable($sortBy) ){
+			if( method_exists($this,'uasort')){
+				$this->uasort($sortBy);
+			}else{
+				uasort($this,$sortBy);
+			}
+			return $this;
+		}
 		if( ! $this->count() )
 			return $this;
 		$this->_sortBy   = $sortBy;
 		$propDef = abstractModel::_getModelStaticProp($this->collectionType,'datasDefs');
-		if( empty($propDef[$sortBy]) ){
+		if( is_string($sortBy) && empty($propDef[$sortBy]) ){
 			#- check for getter for this property
 			if(! $this->current()->_methodExists('get'.ucfirst($sortBy),false,true) )
 				throw new OutOfBoundsException('Try to sort an unsortable property');
@@ -2059,6 +2088,24 @@ abstract class abstractModel{
 
 	public function isRelatedSet($k){
 		return !(empty($this->_oneModels[$k]) && empty($this->_manyModels[$k]));
+	}
+
+	/**
+	* return true if a non temporary hasOne relName is set or at least one non temporary hasMany is set
+	* @return bool
+	*/
+	public function hasNonTemporary($relName){
+		$rel = $this->getRelated($relName);
+		if( $rel instanceof modelCollection ){
+			if( $rel->isEmpty() ){
+				return false;
+			}else if( $rel->count() === $rel->getTemporaries()->count() ){
+				return false;
+			}
+			return true;
+		}else{
+			return $rel->isTemporary() ? false : true;
+		}
 	}
 
 	/**
