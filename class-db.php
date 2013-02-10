@@ -828,8 +828,15 @@ class db{
 	* @return string
 	*/
 	public function process_conds($conds=null){
-		if(is_string($conds) )
+		if(is_string($conds) ){
+			if( preg_match('!^\s*\{!',$conds)){
+				if(! class_exists('jsonQueryClause',false) ){
+					require dirname(__file__).'/class-jsonQueryClause.php';
+				}
+				return 'WHERE '.jsonQueryClause::parse($conds,$this);
+			}
 			return $conds;
+		}
 		elseif(! is_array($conds) )
 			return '';
 		$conds_str = array_shift($conds);
