@@ -2780,7 +2780,7 @@ abstract class abstractModel{
 					unset($hasMany[$name]);
 			}
 		}
-		if( empty($hasOne) && empty($hasMany))
+		if( empty($hasOne) && empty($hasMany) )
 			return $returnDef?array('hasOne'=>$hasOne,'hasMany'=>$hasMany):false;
 		if($relType === null)
 			return $returnDef?array('hasOne'=>$hasOne,'hasMany'=>$hasMany):true;

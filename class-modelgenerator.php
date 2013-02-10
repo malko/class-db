@@ -442,43 +442,103 @@ class BASE_$modelName extends abstractModel{
 		".implode("\n\t\t",$datasTypes)."
 	);
 
+	/**
+	* @return $modelName
+	*/
 	static public function getNew(){
 		return abstractModel::getModelInstance('$modelName');
 	}
 
+	/**
+	* @see abstractModel::getModelInstance
+	* @return $modelName or null on error
+	*/
 	static public function getInstance(\$PK=null){
 		return abstractModel::getModelInstance('$modelName',\$PK);
 	}
+
+	/**
+	* @see abstractModel::getMultipleModelInstances
+	* @return ".$modelName."Collection
+	*/
 	static public function getMultipleInstances(array \$PKs){
 		return abstractModel::getMultipleModelInstances('$modelName',\$PKs);
 	}
+
+	/**
+	* @see abstractModel::getFilteredModelInstances
+	* @return ".$modelName."Collection
+	*/
 	static public function getFilteredInstances(\$filter=null){
 		return abstractModel::getFilteredModelInstances('$modelName',\$filter);
 	}
+
+	/**
+	* @see abstractModel::getFilteredModelInstance
+	* @return $modelName instance or null if not found
+	*/
 	static public function getFilteredInstance(\$filter=null){
 		return abstractModel::getFilteredModelInstance('$modelName',\$filter);
 	}
+
+	/**
+	* @see abstractModel::getFilteredModelInstancesByField
+	* @return ".$modelName."Collection
+	*/
 	static public function getFilteredInstancesByField(\$field,\$filterType,\$args=null){
 		return abstractModel::getFilteredModelInstancesByField('$modelName',\$field,\$filterType,\$args);
 	}
+
+	/**
+	* @see abstractModel::getModelInstanceFromDatas
+	* @return $modelName
+	*/
 	static public function getInstanceFromDatas(\$datas,\$dontOverideIfExists=false,\$bypassFilters=false){
 		return abstractModel::getModelInstanceFromDatas('$modelName',\$datas,\$dontOverideIfExists,\$bypassFilters);
 	}
+
+	/**
+	* @see abstractModel::getAllModelInstances
+	* @return ".$modelName."Collection
+	*/
 	static public function getAllInstances(\$withRelated=null,\$orderedBY=null){
 		return abstractModel::getAllModelInstances('$modelName',\$withRelated,\$orderedBY);
 	}
+
+	/**
+	* @see abstractModel::getPagedModelInstances
+	* @return array array(".$modelName."Collection,string navigationstring,int totalrows);
+	*/
 	static public function getPagedInstances(\$filter=null,\$pageId=1,\$pageSize=10,\$withRelated=null){
 		return abstractModel::getPagedModelInstances('$modelName',\$filter,\$pageId,\$pageSize,\$withRelated);
 	}
+	/**
+	* @see abstractModel::_setModelPagedNav
+	*/
 	static public function _setPagedNav(array \$sliceAttrs=null){
 		return abstractModel::_setModelPagedNav('$modelName',\$sliceAttrs);
 	}
+
+	/**
+	* @see abstractModel::_modelGetSupportedAddons
+	* @return array;
+	*/
 	static public function _getSupportedAddons(){
 		return abstractModel::_modelGetSupportedAddons('$modelName');
 	}
+
+	/**
+	* @see abstractModel::_modelGetSupportedAddons
+	* @return bool
+	*/
 	static public function _supportsAddon(\$modelAddon,\$caseInsensitive=false){
 		return abstractModel::_modelGetSupportedAddons('$modelName',\$modelAddon,\$caseInsensitive);
 	}
+
+	/**
+	* @see abstractModel::getModelCount
+	* @return int or false on error
+	*/
 	static public function getCount(\$filter=null){
 		return abstractModel::getModelCount('$modelName',\$filter);
 	}
@@ -497,6 +557,7 @@ class BASE_$modelName extends abstractModel{
 			return call_user_func('abstractModel::getFilteredModelInstancesByField','$modelName',\$match[1],\$match[2],\$a);
 		}
 	}
+
 	/**
 	* return a static property of the model (even protected).
 	* @param string \$propName name of the static property to retrieve.
@@ -505,15 +566,27 @@ class BASE_$modelName extends abstractModel{
 	static public function _getStatic(\$propName){
 		return abstractModel::_getModelStaticProp('$modelName',\$propName);
 	}
+
 	static public function _setDbConnectionDescriptor(\$descriptor,\$detach=false){
 		self::\$dbConnectionDescriptor = \$descriptor;
 		if( \$detach){
 			abstractModel::getModelLivingInstances('$modelName')->detach();
 		}
 	}
+
+	/**
+	* @return db
+	*/
 	static public function _getDbAdapter(){
 		return abstractModel::getModelDbAdapter('$modelName');
 	}
+
+	/**
+	* check if modelName has some related models definitions.
+	* @param string \$relType   check only for related with the given relType (ignored|requiredBy|dependOn)
+	* @param bool   \$returnDef if true return an array(hasOne=>array(relName => array relDef),hasMany=>array(relName => array relDef))
+	* @return bool or array depend on \$returnDef value
+	*/
 	static public function hasRelDefs(\$relType=null,\$returnDef=false){
 		return abstractModel::modelHasRelDefs('$modelName',\$relType,\$returnDef);
 	}"
