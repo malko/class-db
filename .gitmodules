@@ -1,0 +1,3 @@
+[submodule "scripts/libs"]
+	path = scripts/libs
+	url = git@github.com:malko/console_app.git
